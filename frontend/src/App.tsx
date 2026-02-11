@@ -1,5 +1,8 @@
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom'
 import Dashboard from './pages/Dashboard'
+import Admin from './pages/Admin'
+import Eshop from './pages/Eshop'
+import Invoices from './pages/Invoices'
 
 // You can create more pages as needed
 // import Clients from './pages/Clients'
@@ -24,6 +27,14 @@ function App() {
                 </Link>
                 <Link to="/appointments" className="text-blue-600 hover:text-blue-800">
                   Appointments
+                   <Link to="/admin" className="text-blue-600 hover:text-blue-800">
+                  Admin
+                </Link>
+                <Link to="/eshop" className="text-blue-600 hover:text-blue-800">
+                  E-Shop
+                </Link>
+                <Link to="/invoices" className="text-blue-600 hover:text-blue-800">
+                  Invoices
                 </Link>
               </nav>
             </div>
@@ -34,6 +45,9 @@ function App() {
         <main className="max-w-7xl mx-auto py-6">
           <Routes>
             <Route path="/" element={<Dashboard />} />
+            <Route path="/admin" element={<Admin />} />
+            <Route path="/eshop" element={<Eshop />} />
+            <Route path="/invoices" element={<Invoices />} />
             {/* Add more routes as you create pages */}
             {/* <Route path="/clients" element={<Clients />} /> */}
             {/* <Route path="/appointments" element={<Appointments />} /> */}
