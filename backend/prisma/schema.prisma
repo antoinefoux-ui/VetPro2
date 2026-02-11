@@ -1,5 +1,5 @@
-// This is your Prisma schema file
-// Learn more: https://pris.ly/d/prisma-schema
+// Prisma Schema for VetPro Platform
+// This file is auto-generated from the PostgreSQL schema
 
 generator client {
   provider = "prisma-client-js"
@@ -10,603 +10,716 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ============================================
-// USER MANAGEMENT
-// ============================================
-
 model User {
-  id                String   @id @default(uuid())
-  email             String   @unique
-  passwordHash      String
-  firstName         String
-  lastName          String
-  role              String   // veterinarian, nurse, receptionist, shop_staff, student, admin
-  permissions       String[] // admin, owner, edit, read
-  phoneNumber       String?
-  address           String?
-  specialization    String?
-  licenseNumber     String?
-  emergencyContact  String?
-  voiceProfileUrl   String?
-  isActive          Boolean  @default(true)
-  lastLogin         DateTime?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id              String    @id @default(uuid()) @db.Uuid
+  email           String    @unique
+  passwordHash    String    @map("password_hash")
+  role            String
+  firstName       String    @map("first_name")
+  lastName        String    @map("last_name")
+  phone           String?
+  voiceProfileUrl String?   @map("voice_profile_url")
+  isActive        Boolean   @default(true) @map("is_active")
+  lastLogin       DateTime? @map("last_login")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at")
 
   // Relations
-  appointments      Appointment[]
-  schedules         Schedule[]
-  generatedInvoices Invoice[]       @relation("GeneratedBy")
-  approvedInvoices  Invoice[]       @relation("ApprovedBy")
-  auditLogs         AuditLog[]
-  
-  @@index([email])
-  @@index([role])
+  staffProfile        StaffProfile?
+  schedules           Schedule[]
+  assignedAppointments Appointment[]
+  diagnosesCreated    Diagnosis[]
+  prescriptionsWritten Prescription[]
+  surgeriesPerformed  Surgery[]
+  purchaseOrdersCreated PurchaseOrder[] @relation("CreatedPurchaseOrders")
+  purchaseOrdersApproved PurchaseOrder[] @relation("ApprovedPurchaseOrders")
+  invoicesGenerated   Invoice[] @relation("GeneratedInvoices")
+  invoicesApproved    Invoice[] @relation("ApprovedInvoices")
+  paymentsProcessed   Payment[]
+  emailCampaignsCreated EmailCampaign[]
+  communicationsSent  ClientCommunication[]
+  auditLogs           AuditLog[]
+
   @@map("users")
 }
 
-model Schedule {
-  id          String  @id @default(uuid())
-  userId      String
-  dayOfWeek   Int     // 0-6 (Sunday-Saturday)
-  startTime   String  // HH:MM format
-  endTime     String  // HH:MM format
-  isAvailable Boolean @default(true)
+model StaffProfile {
+  id              String    @id @default(uuid()) @db.Uuid
+  userId          String    @unique @map("user_id") @db.Uuid
+  licenseNumber   String?   @map("license_number")
+  specializations String[]
+  dateHired       DateTime? @map("date_hired") @db.Date
+  employmentType  String?   @map("employment_type")
+  languages       String[]
+  certifications  Json?
+  emergencyContact Json?    @map("emergency_contact")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@index([userId])
+  @@map("staff_profiles")
+}
+
+model Schedule {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  dayOfWeek  Int      @map("day_of_week")
+  startTime  DateTime @map("start_time") @db.Time
+  endTime    DateTime @map("end_time") @db.Time
+  isOnCall   Boolean  @default(false) @map("is_on_call")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@map("schedules")
 }
 
-// ============================================
-// CLIENT & PET MANAGEMENT
-// ============================================
-
 model Client {
-  id                String   @id @default(uuid())
-  firstName         String
-  lastName          String
+  id                String    @id @default(uuid()) @db.Uuid
+  firstName         String    @map("first_name")
+  lastName          String    @map("last_name")
   email             String?
-  phonePrimary      String
-  phoneSecondary    String?
-  addressLine1      String?
-  addressLine2      String?
+  phonePrimary      String    @map("phone_primary")
+  phoneSecondary    String?   @map("phone_secondary")
+  addressLine1      String?   @map("address_line1")
+  addressLine2      String?   @map("address_line2")
   city              String?
   state             String?
-  postalCode        String?
-  country           String   @default("Slovakia")
-  idNumber          String?
-  preferredLanguage String   @default("sk")
-  preferredVetId    String?
-  referralSource    String?
-  marketingConsent  Boolean  @default(false)
+  postalCode        String?   @map("postal_code")
+  country           String?   @default("Slovakia")
+  idNumber          String?   @map("id_number")
+  preferredLanguage String?   @default("sk") @map("preferred_language")
+  preferredVetId    String?   @map("preferred_vet_id") @db.Uuid
+  referralSource    String?   @map("referral_source")
+  marketingConsent  Boolean   @default(false) @map("marketing_consent")
   notes             String?
-  isActive          Boolean  @default(true)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  isActive          Boolean   @default(true) @map("is_active")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at")
 
   // Relations
   pets          Pet[]
   appointments  Appointment[]
   invoices      Invoice[]
-  communications ClientCommunication[]
   eshopOrders   EshopOrder[]
+  communications ClientCommunication[]
 
-  @@index([email])
-  @@index([phonePrimary])
   @@map("clients")
 }
 
 model Pet {
-  id              String    @id @default(uuid())
-  clientId        String
-  name            String
-  species         String
-  breed           String?
-  dateOfBirth     DateTime?
-  gender          String?
-  color           String?
-  microchipNumber String?
-  weight          Float?
-  isDeceased      Boolean   @default(false)
-  deceasedDate    DateTime?
-  allergies       String?
-  medicalNotes    String?
-  insuranceInfo   String?
-  photoUrl        String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id                String    @id @default(uuid()) @db.Uuid
+  clientId          String    @map("client_id") @db.Uuid
+  name              String
+  species           String
+  breed             String?
+  breedSecondary    String?   @map("breed_secondary")
+  sex               String?
+  dateOfBirth       DateTime? @map("date_of_birth") @db.Date
+  colorMarkings     String?   @map("color_markings")
+  microchipNumber   String?   @unique @map("microchip_number")
+  tattooNumber      String?   @map("tattoo_number")
+  insuranceProvider String?   @map("insurance_provider")
+  insurancePolicyNumber String? @map("insurance_policy_number")
+  weightKg          Decimal?  @map("weight_kg") @db.Decimal(6, 2)
+  photoUrls         String[]  @map("photo_urls")
+  isDeceased        Boolean   @default(false) @map("is_deceased")
+  dateOfDeath       DateTime? @map("date_of_death") @db.Date
+  notes             String?
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  client Client @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
   // Relations
-  client            Client                @relation(fields: [clientId], references: [id], onDelete: Cascade)
-  appointments      Appointment[]
-  vaccinations      Vaccination[]
-  diagnoses         Diagnosis[]
-  treatments        Treatment[]
-  prescriptions     Prescription[]
-  surgeries         Surgery[]
-  labTests          LabTest[]
+  weightHistory    WeightHistory[]
+  appointments     Appointment[]
+  vaccinations     Vaccination[]
+  diagnoses        Diagnosis[]
+  treatments       Treatment[]
+  prescriptions    Prescription[]
+  surgeries        Surgery[]
+  labTests         LabTest[]
   diagnosticImaging DiagnosticImaging[]
-  visitNotes        VisitNote[]
-  weightHistory     WeightHistory[]
-  invoices          Invoice[]
+  visitNotes       VisitNote[]
+  invoices         Invoice[]
 
-  @@index([clientId])
-  @@index([microchipNumber])
   @@map("pets")
 }
 
 model WeightHistory {
-  id         String   @id @default(uuid())
-  petId      String
-  weight     Float
-  measuredAt DateTime @default(now())
-  notes      String?
+  id          String   @id @default(uuid()) @db.Uuid
+  petId       String   @map("pet_id") @db.Uuid
+  weightKg    Decimal  @map("weight_kg") @db.Decimal(6, 2)
+  measuredAt  DateTime @default(now()) @map("measured_at")
+  measuredById String? @map("measured_by_id") @db.Uuid
+  notes       String?
 
   pet Pet @relation(fields: [petId], references: [id], onDelete: Cascade)
 
-  @@index([petId])
   @@map("weight_history")
 }
 
-// ============================================
-// APPOINTMENTS
-// ============================================
-
 model Appointment {
-  id               String    @id @default(uuid())
-  clientId         String
-  petId            String
-  assignedVetId    String?
-  appointmentType  String    // consultation, surgery, vaccination, follow_up, emergency, grooming
-  scheduledStart   DateTime
-  scheduledEnd     DateTime
-  actualStart      DateTime?
-  actualEnd        DateTime?
-  status           String    @default("scheduled") // scheduled, confirmed, checked_in, in_progress, completed, cancelled, no_show
-  roomNumber       String?
-  reason           String?
-  specialInstructions String?
-  reminderSent     Boolean   @default(false)
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  id              String    @id @default(uuid()) @db.Uuid
+  petId           String    @map("pet_id") @db.Uuid
+  clientId        String    @map("client_id") @db.Uuid
+  assignedVetId   String?   @map("assigned_vet_id") @db.Uuid
+  appointmentType String    @map("appointment_type")
+  scheduledStart  DateTime  @map("scheduled_start")
+  scheduledEnd    DateTime  @map("scheduled_end")
+  actualStart     DateTime? @map("actual_start")
+  actualEnd       DateTime? @map("actual_end")
+  roomNumber      String?   @map("room_number")
+  status          String    @default("scheduled")
+  reason          String?
+  specialInstructions String? @map("special_instructions")
+  reminderSent    Boolean   @default(false) @map("reminder_sent")
+  confirmationSent Boolean  @default(false) @map("confirmation_sent")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  pet    Pet     @relation(fields: [petId], references: [id], onDelete: Cascade)
+  client Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  vet    User?   @relation(fields: [assignedVetId], references: [id])
 
   // Relations
-  client         Client          @relation(fields: [clientId], references: [id])
-  pet            Pet             @relation(fields: [petId], references: [id])
-  vet            User?           @relation(fields: [assignedVetId], references: [id])
-  visitNotes     VisitNote[]
+  diagnoses     Diagnosis[]
+  treatments    Treatment[]
+  prescriptions Prescription[]
+  surgeries     Surgery[]
+  labTests      LabTest[]
+  imaging       DiagnosticImaging[]
+  visitNotes    VisitNote[]
+  invoices      Invoice[]
   voiceRecordings VoiceRecording[]
-  invoices       Invoice[]
 
-  @@index([clientId])
-  @@index([petId])
-  @@index([assignedVetId])
-  @@index([scheduledStart])
   @@map("appointments")
 }
 
-// ============================================
-// MEDICAL RECORDS
-// ============================================
-
-model VisitNote {
-  id               String   @id @default(uuid())
-  appointmentId    String
-  petId            String
-  veterinarianId   String?
-  chiefComplaint   String
-  history          String?
-  physicalExam     Json?
-  assessment       String?
-  plan             String?
-  voiceRecordingUrl String?
-  transcription    String?
-  aiExtractedData  Json?
-  isDraft          Boolean  @default(true)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  appointment Appointment @relation(fields: [appointmentId], references: [id])
-  pet         Pet         @relation(fields: [petId], references: [id])
-
-  @@index([appointmentId])
-  @@index([petId])
-  @@map("visit_notes")
-}
-
 model Vaccination {
-  id              String   @id @default(uuid())
-  petId           String
-  vaccineName     String
+  id              String   @id @default(uuid()) @db.Uuid
+  petId           String   @map("pet_id") @db.Uuid
+  vaccineName     String   @map("vaccine_name")
   manufacturer    String?
-  lotNumber       String?
-  administeredDate DateTime
-  expirationDate  DateTime?
-  nextDueDate     DateTime?
-  administeredBy  String?
-  site            String?
-  notes           String?
-  createdAt       DateTime @default(now())
+  batchNumber     String?  @map("batch_number")
+  administeredDate DateTime @map("administered_date") @db.Date
+  dueDate         DateTime? @map("due_date") @db.Date
+  administeredById String? @map("administered_by_id") @db.Uuid
+  siteOfInjection String?  @map("site_of_injection")
+  reactions       String?
+  certificateUrl  String?  @map("certificate_url")
+  createdAt       DateTime @default(now()) @map("created_at")
 
   pet Pet @relation(fields: [petId], references: [id], onDelete: Cascade)
 
-  @@index([petId])
-  @@index([nextDueDate])
   @@map("vaccinations")
 }
 
 model Diagnosis {
-  id          String   @id @default(uuid())
-  petId       String
-  diagnosisName String
-  diagnosisCode String?
-  severity    String?
-  diagnosedDate DateTime @default(now())
-  notes       String?
-  createdAt   DateTime @default(now())
+  id            String    @id @default(uuid()) @db.Uuid
+  petId         String    @map("pet_id") @db.Uuid
+  appointmentId String?   @map("appointment_id") @db.Uuid
+  diagnosedById String?   @map("diagnosed_by_id") @db.Uuid
+  diagnosisCode String?   @map("diagnosis_code")
+  diagnosisName String    @map("diagnosis_name")
+  severity      String?
+  status        String    @default("active")
+  diagnosedDate DateTime  @map("diagnosed_date") @db.Date
+  resolvedDate  DateTime? @map("resolved_date") @db.Date
+  notes         String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at")
 
-  pet Pet @relation(fields: [petId], references: [id], onDelete: Cascade)
+  pet         Pet          @relation(fields: [petId], references: [id], onDelete: Cascade)
+  appointment Appointment? @relation(fields: [appointmentId], references: [id])
+  vet         User?        @relation(fields: [diagnosedById], references: [id])
 
-  @@index([petId])
+  // Relations
+  treatments Treatment[]
+
   @@map("diagnoses")
 }
 
 model Treatment {
-  id            String   @id @default(uuid())
-  petId         String
-  treatmentType String
-  description   String
-  startDate     DateTime @default(now())
-  endDate       DateTime?
-  frequency     String?
-  notes         String?
-  createdAt     DateTime @default(now())
+  id              String    @id @default(uuid()) @db.Uuid
+  petId           String    @map("pet_id") @db.Uuid
+  diagnosisId     String?   @map("diagnosis_id") @db.Uuid
+  appointmentId   String?   @map("appointment_id") @db.Uuid
+  treatmentType   String    @map("treatment_type")
+  description     String?
+  startDate       DateTime  @map("start_date") @db.Date
+  endDate         DateTime? @map("end_date") @db.Date
+  administeredById String?  @map("administered_by_id") @db.Uuid
+  response        String?
+  notes           String?
+  createdAt       DateTime  @default(now()) @map("created_at")
 
-  pet Pet @relation(fields: [petId], references: [id], onDelete: Cascade)
+  pet         Pet          @relation(fields: [petId], references: [id], onDelete: Cascade)
+  diagnosis   Diagnosis?   @relation(fields: [diagnosisId], references: [id])
+  appointment Appointment? @relation(fields: [appointmentId], references: [id])
 
-  @@index([petId])
   @@map("treatments")
 }
 
 model Prescription {
-  id           String   @id @default(uuid())
-  petId        String
-  medication   String
-  dosage       String
-  frequency    String
-  duration     String?
-  route        String?
-  instructions String?
-  prescribedDate DateTime @default(now())
-  expiryDate   DateTime?
-  refills      Int      @default(0)
-  notes        String?
-  createdAt    DateTime @default(now())
+  id             String    @id @default(uuid()) @db.Uuid
+  petId          String    @map("pet_id") @db.Uuid
+  appointmentId  String?   @map("appointment_id") @db.Uuid
+  prescribedById String?   @map("prescribed_by_id") @db.Uuid
+  medicationName String    @map("medication_name")
+  dosage         String
+  route          String?
+  frequency      String
+  durationDays   Int?      @map("duration_days")
+  quantity       Decimal?  @db.Decimal(10, 2)
+  unit           String?
+  refillsAllowed Int       @default(0) @map("refills_allowed")
+  instructions   String?
+  warnings       String?
+  prescribedDate DateTime  @map("prescribed_date") @db.Date
+  startDate      DateTime? @map("start_date") @db.Date
+  endDate        DateTime? @map("end_date") @db.Date
+  createdAt      DateTime  @default(now()) @map("created_at")
 
-  pet Pet @relation(fields: [petId], references: [id], onDelete: Cascade)
+  pet         Pet          @relation(fields: [petId], references: [id], onDelete: Cascade)
+  appointment Appointment? @relation(fields: [appointmentId], references: [id])
+  vet         User?        @relation(fields: [prescribedById], references: [id])
 
-  @@index([petId])
   @@map("prescriptions")
 }
 
 model Surgery {
-  id            String   @id @default(uuid())
-  petId         String
-  surgeryType   String
-  surgeon       String?
-  assistants    String?
-  anesthesia    String?
-  surgeryDate   DateTime
-  duration      Int?
-  complications String?
-  outcome       String?
-  notes         String?
-  createdAt     DateTime @default(now())
+  id                String    @id @default(uuid()) @db.Uuid
+  petId             String    @map("pet_id") @db.Uuid
+  appointmentId     String?   @map("appointment_id") @db.Uuid
+  procedureName     String    @map("procedure_name")
+  procedureType     String?   @map("procedure_type")
+  surgeonId         String?   @map("surgeon_id") @db.Uuid
+  anesthetistId     String?   @map("anesthetist_id") @db.Uuid
+  assistingStaffIds String[]  @map("assisting_staff_ids") @db.Uuid
+  surgeryDate       DateTime  @map("surgery_date") @db.Date
+  startTime         DateTime? @map("start_time") @db.Time
+  endTime           DateTime? @map("end_time") @db.Time
+  preOpBloodwork    Json?     @map("pre_op_bloodwork")
+  anesthesiaProtocol String?  @map("anesthesia_protocol")
+  surgicalNotes     String?   @map("surgical_notes")
+  findings          String?
+  complications     String?
+  postOpInstructions String?  @map("post_op_instructions")
+  sutureRemovalDate DateTime? @map("suture_removal_date") @db.Date
+  photosUrls        String[]  @map("photos_urls")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at")
 
-  pet Pet @relation(fields: [petId], references: [id], onDelete: Cascade)
+  pet         Pet          @relation(fields: [petId], references: [id], onDelete: Cascade)
+  appointment Appointment? @relation(fields: [appointmentId], references: [id])
+  surgeon     User?        @relation(fields: [surgeonId], references: [id])
 
-  @@index([petId])
   @@map("surgeries")
 }
 
 model LabTest {
-  id          String   @id @default(uuid())
-  petId       String
-  testType    String
-  testDate    DateTime @default(now())
-  results     Json?
-  interpretation String?
-  performedBy String?
-  notes       String?
-  createdAt   DateTime @default(now())
+  id                  String    @id @default(uuid()) @db.Uuid
+  petId               String    @map("pet_id") @db.Uuid
+  appointmentId       String?   @map("appointment_id") @db.Uuid
+  orderedById         String?   @map("ordered_by_id") @db.Uuid
+  testType            String    @map("test_type")
+  orderedDate         DateTime  @map("ordered_date") @db.Date
+  sampleCollectedDate DateTime? @map("sample_collected_date") @db.Date
+  resultsReceivedDate DateTime? @map("results_received_date") @db.Date
+  laboratoryName      String?   @map("laboratory_name")
+  results             Json?
+  abnormalities       String[]
+  interpretation      String?
+  fileUrl             String?   @map("file_url")
+  status              String    @default("ordered")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at")
 
-  pet Pet @relation(fields: [petId], references: [id], onDelete: Cascade)
+  pet         Pet          @relation(fields: [petId], references: [id], onDelete: Cascade)
+  appointment Appointment? @relation(fields: [appointmentId], references: [id])
 
-  @@index([petId])
   @@map("lab_tests")
 }
 
 model DiagnosticImaging {
-  id          String   @id @default(uuid())
-  petId       String
-  imagingType String   // xray, ultrasound, mri, ct
-  bodyPart    String?
-  imageUrl    String?
-  findings    String?
-  imagedDate  DateTime @default(now())
-  radiologist String?
-  notes       String?
-  createdAt   DateTime @default(now())
+  id               String    @id @default(uuid()) @db.Uuid
+  petId            String    @map("pet_id") @db.Uuid
+  appointmentId    String?   @map("appointment_id") @db.Uuid
+  orderedById      String?   @map("ordered_by_id") @db.Uuid
+  imagingType      String    @map("imaging_type")
+  bodyPart         String?   @map("body_part")
+  orderedDate      DateTime  @map("ordered_date") @db.Date
+  performedDate    DateTime? @map("performed_date") @db.Date
+  findings         String?
+  radiologistReport String?  @map("radiologist_report")
+  imageUrls        String[]  @map("image_urls")
+  videoUrls        String[]  @map("video_urls")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at")
 
-  pet Pet @relation(fields: [petId], references: [id], onDelete: Cascade)
+  pet         Pet          @relation(fields: [petId], references: [id], onDelete: Cascade)
+  appointment Appointment? @relation(fields: [appointmentId], references: [id])
 
-  @@index([petId])
   @@map("diagnostic_imaging")
 }
 
-// ============================================
-// VOICE RECORDINGS
-// ============================================
+model VisitNote {
+  id              String    @id @default(uuid()) @db.Uuid
+  appointmentId   String    @map("appointment_id") @db.Uuid
+  petId           String    @map("pet_id") @db.Uuid
+  veterinarianId  String?   @map("veterinarian_id") @db.Uuid
+  chiefComplaint  String?   @map("chief_complaint")
+  history         String?
+  physicalExam    Json?     @map("physical_exam")
+  assessment      String?
+  plan            String?
+  voiceRecordingUrl String? @map("voice_recording_url")
+  transcription   String?
+  aiExtractedData Json?     @map("ai_extracted_data")
+  isDraft         Boolean   @default(true) @map("is_draft")
+  approvedAt      DateTime? @map("approved_at")
+  approvedById    String?   @map("approved_by_id") @db.Uuid
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @default(now()) @updatedAt @map("updated_at")
 
-model VoiceRecording {
-  id                String   @id @default(uuid())
-  appointmentId     String
-  roomNumber        String?
-  recordingUrl      String
-  durationSeconds   Int
-  transcription     String?
-  speakerDiarization Json?
-  aiExtractedData   Json?
-  processed         Boolean  @default(false)
-  createdAt         DateTime @default(now())
+  appointment Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  pet         Pet         @relation(fields: [petId], references: [id], onDelete: Cascade)
 
-  appointment Appointment @relation(fields: [appointmentId], references: [id])
-
-  @@index([appointmentId])
-  @@map("voice_recordings")
+  @@map("visit_notes")
 }
 
-// ============================================
-// INVOICING & PAYMENTS
-// ============================================
-
-model Invoice {
-  id            String   @id @default(uuid())
-  invoiceNumber String   @unique
-  clientId      String
-  petId         String?
-  appointmentId String?
-  status        String   @default("draft") // draft, pending_approval, approved, sent, paid, partially_paid, overdue, cancelled
-  issueDate     DateTime @default(now())
-  dueDate       DateTime?
-  subtotal      Float
-  taxAmount     Float
-  totalAmount   Float
-  amountPaid    Float    @default(0)
-  balanceDue    Float
-  aiGenerated   Boolean  @default(false)
-  generatedById String?
-  approvedById  String?
-  approvedAt    DateTime?
-  notes         String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  // Relations
-  client      Client        @relation(fields: [clientId], references: [id])
-  pet         Pet?          @relation(fields: [petId], references: [id])
-  appointment Appointment?  @relation(fields: [appointmentId], references: [id])
-  generatedBy User?         @relation("GeneratedBy", fields: [generatedById], references: [id])
-  approvedBy  User?         @relation("ApprovedBy", fields: [approvedById], references: [id])
-  items       InvoiceItem[]
-  payments    Payment[]
-
-  @@index([clientId])
-  @@index([invoiceNumber])
-  @@index([status])
-  @@map("invoices")
-}
-
-model InvoiceItem {
-  id                String  @id @default(uuid())
-  invoiceId         String
-  itemType          String  // service, product, medication, diagnostic
-  description       String
-  quantity          Float
-  unitPrice         Float
-  taxRate           Float   @default(20)
-  discountPercentage Float  @default(0)
-  subtotal          Float
-  total             Float
-  inventoryItemId   String?
-
-  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-
-  @@index([invoiceId])
-  @@map("invoice_items")
-}
-
-model Payment {
-  id                  String   @id @default(uuid())
-  invoiceId           String
-  paymentMethod       String   // cash, card, bank_transfer
-  amount              Float
-  referenceNumber     String?
-  ekasaReceiptNumber  String?
-  ekasaOkpCode        String?
-  processedById       String?
-  notes               String?
-  paymentDate         DateTime @default(now())
-  createdAt           DateTime @default(now())
-
-  invoice Invoice @relation(fields: [invoiceId], references: [id])
-
-  @@index([invoiceId])
-  @@map("payments")
-}
-
-// ============================================
-// INVENTORY
-// ============================================
-
+// Inventory Models
 model InventoryItem {
-  id                  String    @id @default(uuid())
-  categoryId          String?
-  sku                 String?   @unique
-  barcode             String?
-  name                String
-  description         String?
-  manufacturer        String?
-  unitOfMeasure       String?
-  packageSize         String?
-  costPerUnit         Float?
-  sellingPrice        Float?
-  markupPercentage    Float?
-  isPrescription      Boolean   @default(false)
-  isControlledSubstance Boolean @default(false)
-  requiresRefrigeration Boolean @default(false)
-  minimumStock        Int       @default(0)
-  optimalStock        Int?
-  currentStock        Int       @default(0)
-  location            String?
-  isSellableInEshop   Boolean   @default(false)
-  isActive            Boolean   @default(true)
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  id                String   @id @default(uuid()) @db.Uuid
+  categoryId        String?  @map("category_id") @db.Uuid
+  sku               String?  @unique
+  barcode           String?
+  name              String
+  description       String?
+  manufacturer      String?
+  unitOfMeasure     String?  @map("unit_of_measure")
+  packageSize       String?  @map("package_size")
+  costPerUnit       Decimal? @map("cost_per_unit") @db.Decimal(10, 2)
+  sellingPrice      Decimal? @map("selling_price") @db.Decimal(10, 2)
+  markupPercentage  Decimal? @map("markup_percentage") @db.Decimal(5, 2)
+  isPrescription    Boolean  @default(false) @map("is_prescription")
+  isControlledSubstance Boolean @default(false) @map("is_controlled_substance")
+  requiresRefrigeration Boolean @default(false) @map("requires_refrigeration")
+  minimumStock      Int      @default(0) @map("minimum_stock")
+  optimalStock      Int?     @map("optimal_stock")
+  currentStock      Int      @default(0) @map("current_stock")
+  location          String?
+  isSellableInEshop Boolean  @default(false) @map("is_sellable_in_eshop")
+  eshopImages       String[] @map("eshop_images")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at")
 
   // Relations
-  batches      InventoryBatch[]
-  transactions InventoryTransaction[]
+  batches       InventoryBatch[]
+  transactions  InventoryTransaction[]
+  invoiceItems  InvoiceItem[]
+  eshopOrderItems EshopOrderItem[]
+  poItems       PurchaseOrderItem[]
 
-  @@index([sku])
-  @@index([name])
   @@map("inventory_items")
 }
 
 model InventoryBatch {
-  id             String    @id @default(uuid())
-  itemId         String
-  batchNumber    String
-  quantity       Int
-  costPerUnit    Float
-  expirationDate DateTime?
-  supplierId     String?
-  receivedDate   DateTime  @default(now())
+  id            String   @id @default(uuid()) @db.Uuid
+  itemId        String   @map("item_id") @db.Uuid
+  batchNumber   String?  @map("batch_number")
+  quantity      Int
+  costPerUnit   Decimal? @map("cost_per_unit") @db.Decimal(10, 2)
+  expirationDate DateTime? @map("expiration_date") @db.Date
+  receivedDate  DateTime @default(now()) @map("received_date") @db.Date
+  supplierId    String?  @map("supplier_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at")
 
-  item InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  item     InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  supplier Supplier?     @relation(fields: [supplierId], references: [id])
 
-  @@index([itemId])
-  @@index([expirationDate])
   @@map("inventory_batches")
 }
 
 model InventoryTransaction {
-  id              String   @id @default(uuid())
-  itemId          String
-  transactionType String   // purchase, sale, adjustment, damage, expiry
+  id              String   @id @default(uuid()) @db.Uuid
+  itemId          String   @map("item_id") @db.Uuid
+  transactionType String   @map("transaction_type")
   quantity        Int
-  unitCost        Float?
-  totalCost       Float?
-  referenceType   String?
-  referenceId     String?
-  performedById   String?
+  unitCost        Decimal? @map("unit_cost") @db.Decimal(10, 2)
+  totalCost       Decimal? @map("total_cost") @db.Decimal(10, 2)
+  referenceType   String?  @map("reference_type")
+  referenceId     String?  @map("reference_id") @db.Uuid
+  performedById   String?  @map("performed_by_id") @db.Uuid
   notes           String?
-  createdAt       DateTime @default(now())
+  createdAt       DateTime @default(now()) @map("created_at")
 
   item InventoryItem @relation(fields: [itemId], references: [id])
 
-  @@index([itemId])
-  @@index([createdAt])
   @@map("inventory_transactions")
 }
 
-// ============================================
-// COMMUNICATIONS
-// ============================================
+model Supplier {
+  id            String   @id @default(uuid()) @db.Uuid
+  name          String
+  contactPerson String?  @map("contact_person")
+  email         String?
+  phone         String?
+  address       String?
+  website       String?
+  paymentTerms  String?  @map("payment_terms")
+  leadTimeDays  Int?     @map("lead_time_days")
+  isActive      Boolean  @default(true) @map("is_active")
+  notes         String?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
 
-model ClientCommunication {
-  id                String   @id @default(uuid())
-  clientId          String
-  communicationType String   // email, sms, call, in_person
-  direction         String   // inbound, outbound
-  subject           String?
-  content           String?
-  status            String   @default("draft") // draft, sent, delivered, failed, read
-  sentById          String?
-  sentAt            DateTime?
-  metadata          Json?
-  createdAt         DateTime @default(now())
+  // Relations
+  batches        InventoryBatch[]
+  purchaseOrders PurchaseOrder[]
+
+  @@map("suppliers")
+}
+
+model PurchaseOrder {
+  id                    String    @id @default(uuid()) @db.Uuid
+  poNumber              String    @unique @map("po_number")
+  supplierId            String    @map("supplier_id") @db.Uuid
+  status                String    @default("draft")
+  orderDate             DateTime  @default(now()) @map("order_date") @db.Date
+  expectedDeliveryDate  DateTime? @map("expected_delivery_date") @db.Date
+  actualDeliveryDate    DateTime? @map("actual_delivery_date") @db.Date
+  subtotal              Decimal?  @map("subtotal") @db.Decimal(10, 2)
+  tax                   Decimal?  @db.Decimal(10, 2)
+  total                 Decimal?  @db.Decimal(10, 2)
+  createdById           String    @map("created_by_id") @db.Uuid
+  approvedById          String?   @map("approved_by_id") @db.Uuid
+  notes                 String?
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  supplier    Supplier @relation(fields: [supplierId], references: [id])
+  createdBy   User     @relation("CreatedPurchaseOrders", fields: [createdById], references: [id])
+  approvedBy  User?    @relation("ApprovedPurchaseOrders", fields: [approvedById], references: [id])
+
+  // Relations
+  items PurchaseOrderItem[]
+
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id               String  @id @default(uuid()) @db.Uuid
+  poId             String  @map("po_id") @db.Uuid
+  itemId           String  @map("item_id") @db.Uuid
+  quantityOrdered  Int     @map("quantity_ordered")
+  quantityReceived Int     @default(0) @map("quantity_received")
+  unitCost         Decimal @map("unit_cost") @db.Decimal(10, 2)
+  totalCost        Decimal @map("total_cost") @db.Decimal(10, 2)
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  purchaseOrder PurchaseOrder  @relation(fields: [poId], references: [id], onDelete: Cascade)
+  item          InventoryItem  @relation(fields: [itemId], references: [id])
+
+  @@map("purchase_order_items")
+}
+
+// Billing Models
+model Invoice {
+  id            String    @id @default(uuid()) @db.Uuid
+  invoiceNumber String    @unique @map("invoice_number")
+  clientId      String    @map("client_id") @db.Uuid
+  petId         String?   @map("pet_id") @db.Uuid
+  appointmentId String?   @map("appointment_id") @db.Uuid
+  status        String    @default("draft")
+  issueDate     DateTime  @default(now()) @map("issue_date") @db.Date
+  dueDate       DateTime? @map("due_date") @db.Date
+  subtotal      Decimal   @db.Decimal(10, 2)
+  taxAmount     Decimal   @default(0) @map("tax_amount") @db.Decimal(10, 2)
+  discountAmount Decimal  @default(0) @map("discount_amount") @db.Decimal(10, 2)
+  totalAmount   Decimal   @map("total_amount") @db.Decimal(10, 2)
+  amountPaid    Decimal   @default(0) @map("amount_paid") @db.Decimal(10, 2)
+  balanceDue    Decimal?  @map("balance_due") @db.Decimal(10, 2)
+  aiGenerated   Boolean   @default(false) @map("ai_generated")
+  generatedById String?   @map("generated_by_id") @db.Uuid
+  approvedById  String?   @map("approved_by_id") @db.Uuid
+  approvedAt    DateTime? @map("approved_at")
+  notes         String?
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  client      Client       @relation(fields: [clientId], references: [id])
+  pet         Pet?         @relation(fields: [petId], references: [id])
+  appointment Appointment? @relation(fields: [appointmentId], references: [id])
+  generatedBy User?        @relation("GeneratedInvoices", fields: [generatedById], references: [id])
+  approvedBy  User?        @relation("ApprovedInvoices", fields: [approvedById], references: [id])
+
+  // Relations
+  items    InvoiceItem[]
+  payments Payment[]
+
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id                 String  @id @default(uuid()) @db.Uuid
+  invoiceId          String  @map("invoice_id") @db.Uuid
+  itemType           String  @map("item_type")
+  description        String
+  quantity           Decimal @db.Decimal(10, 2)
+  unitPrice          Decimal @map("unit_price") @db.Decimal(10, 2)
+  taxRate            Decimal @default(0) @map("tax_rate") @db.Decimal(5, 2)
+  discountPercentage Decimal @default(0) @map("discount_percentage") @db.Decimal(5, 2)
+  subtotal           Decimal @db.Decimal(10, 2)
+  total              Decimal @db.Decimal(10, 2)
+  inventoryItemId    String? @map("inventory_item_id") @db.Uuid
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  invoice       Invoice        @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  inventoryItem InventoryItem? @relation(fields: [inventoryItemId], references: [id])
+
+  @@map("invoice_items")
+}
+
+model Payment {
+  id                String   @id @default(uuid()) @db.Uuid
+  invoiceId         String   @map("invoice_id") @db.Uuid
+  paymentMethod     String   @map("payment_method")
+  amount            Decimal  @db.Decimal(10, 2)
+  paymentDate       DateTime @default(now()) @map("payment_date") @db.Date
+  referenceNumber   String?  @map("reference_number")
+  ekasaReceiptNumber String? @map("ekasa_receipt_number")
+  ekasaOkpCode      String?  @map("ekasa_okp_code")
+  processedById     String?  @map("processed_by_id") @db.Uuid
+  notes             String?
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  invoice     Invoice @relation(fields: [invoiceId], references: [id])
+  processedBy User?   @relation(fields: [processedById], references: [id])
+
+  @@map("payments")
+}
+
+// E-Commerce Models
+model EshopOrder {
+  id              String   @id @default(uuid()) @db.Uuid
+  orderNumber     String   @unique @map("order_number")
+  clientId        String   @map("client_id") @db.Uuid
+  status          String   @default("pending")
+  orderDate       DateTime @default(now()) @map("order_date")
+  shippingMethod  String?  @map("shipping_method")
+  shippingCost    Decimal  @default(0) @map("shipping_cost") @db.Decimal(10, 2)
+  trackingNumber  String?  @map("tracking_number")
+  subtotal        Decimal  @db.Decimal(10, 2)
+  tax             Decimal  @default(0) @db.Decimal(10, 2)
+  discount        Decimal  @default(0) @db.Decimal(10, 2)
+  total           Decimal  @db.Decimal(10, 2)
+  shippingAddress Json?    @map("shipping_address")
+  billingAddress  Json?    @map("billing_address")
+  paymentMethod   String?  @map("payment_method")
+  paymentStatus   String   @default("pending") @map("payment_status")
+  notes           String?
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at")
 
   client Client @relation(fields: [clientId], references: [id])
 
-  @@index([clientId])
-  @@map("client_communications")
-}
+  // Relations
+  items EshopOrderItem[]
 
-// ============================================
-// E-SHOP
-// ============================================
-
-model EshopOrder {
-  id             String   @id @default(uuid())
-  orderNumber    String   @unique
-  clientId       String
-  status         String   @default("pending")
-  subtotal       Float
-  shippingFee    Float    @default(0)
-  taxAmount      Float
-  totalAmount    Float
-  paymentMethod  String?
-  paymentStatus  String   @default("pending")
-  shippingAddress Json?
-  notes          String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  client Client          @relation(fields: [clientId], references: [id])
-  items  EshopOrderItem[]
-
-  @@index([clientId])
-  @@index([orderNumber])
   @@map("eshop_orders")
 }
 
 model EshopOrderItem {
-  id        String @id @default(uuid())
-  orderId   String
-  productId String
+  id        String  @id @default(uuid()) @db.Uuid
+  orderId   String  @map("order_id") @db.Uuid
+  itemId    String  @map("item_id") @db.Uuid
   quantity  Int
-  unitPrice Float
-  total     Float
+  unitPrice Decimal @map("unit_price") @db.Decimal(10, 2)
+  subtotal  Decimal @db.Decimal(10, 2)
+  createdAt DateTime @default(now()) @map("created_at")
 
-  order EshopOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order EshopOrder    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  item  InventoryItem @relation(fields: [itemId], references: [id])
 
-  @@index([orderId])
   @@map("eshop_order_items")
 }
 
-// ============================================
-// AUDIT LOGS
-// ============================================
+// Communication Models
+model EmailCampaign {
+  id                String    @id @default(uuid()) @db.Uuid
+  name              String
+  subject           String
+  content           String
+  aiGenerated       Boolean   @default(false) @map("ai_generated")
+  status            String    @default("draft")
+  scheduledSendTime DateTime? @map("scheduled_send_time")
+  sentAt            DateTime? @map("sent_at")
+  totalRecipients   Int?      @map("total_recipients")
+  totalOpened       Int       @default(0) @map("total_opened")
+  totalClicked      Int       @default(0) @map("total_clicked")
+  createdById       String    @map("created_by_id") @db.Uuid
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @default(now()) @updatedAt @map("updated_at")
 
+  createdBy User @relation(fields: [createdById], references: [id])
+
+  @@map("email_campaigns")
+}
+
+model ClientCommunication {
+  id                 String   @id @default(uuid()) @db.Uuid
+  clientId           String   @map("client_id") @db.Uuid
+  communicationType  String   @map("communication_type")
+  direction          String
+  subject            String?
+  content            String?
+  sentById           String?  @map("sent_by_id") @db.Uuid
+  sentAt             DateTime @default(now()) @map("sent_at")
+  status             String?
+  metadata           Json?
+
+  client Client @relation(fields: [clientId], references: [id])
+  sentBy User?  @relation(fields: [sentById], references: [id])
+
+  @@map("client_communications")
+}
+
+// AI & Voice
+model VoiceRecording {
+  id                String   @id @default(uuid()) @db.Uuid
+  appointmentId     String?  @map("appointment_id") @db.Uuid
+  roomNumber        String?  @map("room_number")
+  recordingUrl      String   @map("recording_url")
+  durationSeconds   Int?     @map("duration_seconds")
+  transcription     String?
+  speakerDiarization Json?   @map("speaker_diarization")
+  aiExtractedData   Json?    @map("ai_extracted_data")
+  processed         Boolean  @default(false)
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  appointment Appointment? @relation(fields: [appointmentId], references: [id])
+
+  @@map("voice_recordings")
+}
+
+// System
 model AuditLog {
-  id         String   @id @default(uuid())
-  userId     String?
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String?  @map("user_id") @db.Uuid
   action     String
-  entityType String
-  entityId   String?
-  oldValues  Json?
-  newValues  Json?
-  ipAddress  String?
-  userAgent  String?
-  createdAt  DateTime @default(now())
+  entityType String?  @map("entity_type")
+  entityId   String?  @map("entity_id") @db.Uuid
+  oldValues  Json?    @map("old_values")
+  newValues  Json?    @map("new_values")
+  ipAddress  String?  @map("ip_address")
+  userAgent  String?  @map("user_agent")
+  createdAt  DateTime @default(now()) @map("created_at")
 
   user User? @relation(fields: [userId], references: [id])
 
-  @@index([userId])
-  @@index([entityType])
-  @@index([createdAt])
   @@map("audit_logs")
 }
