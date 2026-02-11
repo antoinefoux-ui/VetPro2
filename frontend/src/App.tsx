@@ -4,15 +4,10 @@ import Admin from './pages/Admin'
 import Eshop from './pages/Eshop'
 import Invoices from './pages/Invoices'
 
-// You can create more pages as needed
-// import Clients from './pages/Clients'
-// import Appointments from './pages/Appointments'
-
 function App() {
   return (
     <Router>
       <div className="min-h-screen bg-gray-100">
-        {/* Navigation Header */}
         <header className="bg-white shadow">
           <div className="max-w-7xl mx-auto px-4 py-4">
             <div className="flex items-center justify-between">
@@ -22,12 +17,7 @@ function App() {
                 <Link to="/" className="text-blue-600 hover:text-blue-800">
                   Dashboard
                 </Link>
-                <Link to="/clients" className="text-blue-600 hover:text-blue-800">
-                  Clients
-                </Link>
-                <Link to="/appointments" className="text-blue-600 hover:text-blue-800">
-                  Appointments
-                   <Link to="/admin" className="text-blue-600 hover:text-blue-800">
+                <Link to="/admin" className="text-blue-600 hover:text-blue-800">
                   Admin
                 </Link>
                 <Link to="/eshop" className="text-blue-600 hover:text-blue-800">
@@ -41,16 +31,12 @@ function App() {
           </div>
         </header>
 
-        {/* Main Content */}
         <main className="max-w-7xl mx-auto py-6">
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/admin" element={<Admin />} />
             <Route path="/eshop" element={<Eshop />} />
             <Route path="/invoices" element={<Invoices />} />
-            {/* Add more routes as you create pages */}
-            {/* <Route path="/clients" element={<Clients />} /> */}
-            {/* <Route path="/appointments" element={<Appointments />} /> */}
           </Routes>
         </main>
       </div>
