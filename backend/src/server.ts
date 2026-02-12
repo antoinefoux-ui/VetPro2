@@ -23,7 +23,7 @@ import adminSettingsRoutes from './routes/admin-settings.routes';
 dotenv.config();
 
 // Initialize Prisma Client
-export const prisma = new PrismaClient({
+export const prisma: any = new PrismaClient({
   log: process.env.NODE_ENV === 'development' 
     ? ['query', 'error', 'warn'] 
     : ['error'],
