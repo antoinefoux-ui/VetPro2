@@ -39,16 +39,7 @@ function Dashboard() {
         monthlyRevenue: 0,
       });
       setError(null);
-    } catch (err) {
-      console.error('Error fetching dashboard stats:', err);
-      setStats({
-        totalClients: 156,
-        todayAppointments: 12,
-        pendingInvoices: 8,
-        monthlyRevenue: 24500,
-      });
-      setError('Using demo data - backend connection issue');
-    } finally {
+  
       setLoading(false);
     }
   };
