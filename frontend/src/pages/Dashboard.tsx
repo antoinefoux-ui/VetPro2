@@ -22,44 +22,24 @@ function Dashboard() {
     fetchDashboardStats();
   }, []);
 
-      const fetchDashboardStats = async () => {
-  try {
-    setLoading(true);
-    console.log('🔍 Fetching from:', api.baseURL);
-    
-    // Try to fetch real data from backend
-    const clientsResponse = await api.fetch('/api/clients');
-    const appointmentsResponse = await api.fetch('/api/appointments');
-    const invoicesResponse = await api.fetch('/api/invoices');
+  const fetchDashboardStats = async () => {
+    try {
+      setLoading(true);
+      console.log('🔍 Fetching from:', api.baseURL);
+      
+      const clientsResponse = await api.fetch('/api/clients');
+      const appointmentsResponse = await api.fetch('/api/appointments');
+      const invoicesResponse = await api.fetch('/api/invoices');
 
-    console.log('📦 Clients data:', clientsResponse);
-    console.log('📦 Appointments data:', appointmentsResponse);
-    console.log('📦 Invoices data:', invoicesResponse);
-
-    setStats({
-      totalClients: clientsResponse?.data?.length || 0,
-      todayAppointments: appointmentsResponse?.data?.length || 0,
-      pendingInvoices: invoicesResponse?.data?.filter((inv: any) => inv.status === 'pending').length || 0,
-      monthlyRevenue: 0, // Calculate from invoices if needed
-    });
-    setError(null);
-  } catch (err) {
-    console.error('Error fetching dashboard stats:', err);
-    // Use mock data if API fails
-    setStats({
-      totalClients: 156,
-      todayAppointments: 12,
-      pendingInvoices: 8,
-      monthlyRevenue: 24500,
-    });
-    setError('Using demo data - backend connection issue');
-  } finally {
-    setLoading(false);
-  }
-};
-
+      setStats({
+        totalClients: clientsResponse?.data?.length || 0,
+        todayAppointments: appointmentsResponse?.data?.length || 0,
+        pendingInvoices: invoicesResponse?.data?.filter((inv: any) => inv.status === 'pending').length || 0,
+        monthlyRevenue: 0,
+      });
+      setError(null);
+    } catch (err) {
       console.error('Error fetching dashboard stats:', err);
-      // Use mock data if API fails
       setStats({
         totalClients: 156,
         todayAppointments: 12,
@@ -96,7 +76,6 @@ function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Total Clients */}
         <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -111,7 +90,6 @@ function Dashboard() {
           </div>
         </div>
 
-        {/* Today's Appointments */}
         <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -126,7 +104,6 @@ function Dashboard() {
           </div>
         </div>
 
-        {/* Pending Invoices */}
         <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -141,7 +118,6 @@ function Dashboard() {
           </div>
         </div>
 
-        {/* Monthly Revenue */}
         <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -157,7 +133,6 @@ function Dashboard() {
         </div>
       </div>
 
-      {/* Backend Connection Status */}
       <div className="mt-6 bg-white rounded-xl shadow-lg border border-gray-200 p-6">
         <h2 className="text-xl font-bold text-gray-900 mb-4">System Status</h2>
         <div className="flex items-center gap-3">
