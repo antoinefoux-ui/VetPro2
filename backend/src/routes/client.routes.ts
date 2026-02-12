@@ -1,15 +1,16 @@
 import { Router } from 'express';
-import { authMiddleware } from '../middleware/auth.middleware';
+import { authenticate } from '../middleware/auth.middleware';
+import * as clientController from '../controllers/client.controller';
 
 const router = Router();
 
-router.use(authMiddleware);
+// Public route for dashboard stats
+router.get('/', clientController.getAllClients); // Remove authenticate middleware
 
-// Placeholder routes - implement with controllers
-router.get('/', (req, res) => res.json({ message: 'Get all clients' }));
-router.get('/:id', (req, res) => res.json({ message: 'Get client by ID' }));
-router.post('/', (req, res) => res.json({ message: 'Create client' }));
-router.put('/:id', (req, res) => res.json({ message: 'Update client' }));
-router.delete('/:id', (req, res) => res.json({ message: 'Delete client' }));
+// Protected routes
+router.post('/', authenticate, clientController.createClient);
+router.get('/:id', authenticate, clientController.getClientById);
+router.put('/:id', authenticate, clientController.updateClient);
+router.delete('/:id', authenticate, clientController.deleteClient);
 
 export default router;
