@@ -2,6 +2,10 @@
 import React, { useEffect, useState } from 'react';
 import api from '../config/api';
 
+interface InvoiceSummary {
+  status: string;
+}
+
 interface DashboardStats {
   totalClients: number;
   todayAppointments: number;
@@ -41,7 +45,7 @@ function Dashboard() {
       setStats({
         totalClients: clientsResponse?.data?.length || 0,
         todayAppointments: appointmentsResponse?.data?.length || 0,
-        pendingInvoices: invoicesResponse?.data?.filter((inv: any) => inv.status === 'pending').length || 0,
+        pendingInvoices: invoicesResponse?.data?.filter((inv: InvoiceSummary) => inv.status === 'pending').length || 0,
         monthlyRevenue: 0,
       });
       setError(null);

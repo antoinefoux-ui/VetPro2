@@ -11,6 +11,13 @@ const prismaAny = prisma as any;
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this';
 
+interface JwtPayload {
+  id: string;
+  email: string;
+  role: string;
+  permissions: string[];
+}
+
 const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
@@ -44,7 +51,10 @@ router.post('/register', async (req, res) => {
     // Create user
     const user = await prismaAny.user.create({
       data: {
-        ...validated,
+        email: validated.email,
+        firstName: validated.firstName,
+        lastName: validated.lastName,
+        role: validated.role,
         passwordHash,
         permissions: ['read'],
       },
@@ -142,7 +152,7 @@ router.get('/me', async (req: AuthenticatedRequest, res) => {
       return res.status(401).json({ error: 'No token provided' });
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
 
     const user = await prismaAny.user.findUnique({
       where: { id: decoded.id },

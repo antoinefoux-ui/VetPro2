@@ -545,9 +545,9 @@ Format nicely with sections.
    * Real-time transcription stream (for live consultations)
    */
   static async streamTranscription(
-    audioStream: ReadableStream,
-    onTranscript: (text: string) => void,
-    onSpeakerChange: (speaker: string) => void
+    _audioStream: ReadableStream,
+    _onTranscript: (text: string) => void,
+    _onSpeakerChange: (speaker: string) => void
   ): Promise<void> {
     // This would integrate with real-time transcription services
     // Like AssemblyAI or Deepgram for streaming

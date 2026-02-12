@@ -149,7 +149,7 @@ export class AdminUserController {
       }
 
       // Don't send password hash
-      const { passwordHash, ...userData } = user;
+      const { passwordHash: _passwordHash, ...userData } = user;
 
       res.json(userData);
 
