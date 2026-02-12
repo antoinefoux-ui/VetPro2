@@ -1,5 +1,5 @@
 import React from 'react';
-import ProductCatalog from '../components/eshop/productcatalog.tsx';
+import ProductCatalog from '../components/eshop/productcatalog';
 
 function Eshop() {
   return (
