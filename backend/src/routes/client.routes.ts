@@ -1,16 +1,21 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth.middleware';
-import * as clientController from '../controllers/client.controller';
+import { ClientController } from '../controllers/client.controller';
 
 const router = Router();
 
 // Public route for dashboard stats
-router.get('/', clientController.getAllClients); // Remove authenticate middleware
+router.get('/', ClientController.getAll);
 
 // Protected routes
-router.post('/', authenticate, clientController.createClient);
-router.get('/:id', authenticate, clientController.getClientById);
-router.put('/:id', authenticate, clientController.updateClient);
-router.delete('/:id', authenticate, clientController.deleteClient);
+router.post('/', authenticate, ClientController.create);
+router.get('/:id', authenticate, ClientController.getById);
+router.put('/:id', authenticate, ClientController.update);
+router.delete('/:id', authenticate, ClientController.delete);
+router.get('/:id/communications', authenticate, ClientController.getCommunications);
+router.post('/:id/communications', authenticate, ClientController.sendCommunication);
+router.get('/:id/statistics', authenticate, ClientController.getStatistics);
+router.post('/merge', authenticate, ClientController.merge);
+router.get('/:id/export', authenticate, ClientController.exportData);
 
 export default router;
