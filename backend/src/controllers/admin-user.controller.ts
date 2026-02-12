@@ -149,7 +149,7 @@ export class AdminUserController {
       }
 
       // Don't send password hash
-      const { passwordHash, ...userData } = user;
+      const { passwordHash: _passwordHash, ...userData } = user;
 
       res.json(userData);
 
@@ -179,7 +179,7 @@ export class AdminUserController {
       const passwordHash = await bcrypt.hash(validated.password, 12);
 
       // Create user
-      const { password, ...userData } = validated;
+      const { password: _password, ...userData } = validated;
       const user = await prismaAny.user.create({
         data: {
           ...userData,
