@@ -1,12 +1,13 @@
 import React from 'react';
+import AdminPanel from '../components/admin/AdminPanel';
 
-const Admin: React.FC = () => {
+function Admin() {
   return (
     <div className="p-6">
-      <h1 className="text-3xl font-bold mb-6">Admin</h1>
-      <p>This is the Admin page. Content coming soon...</p>
+      <h1 className="text-2xl font-bold mb-6">Admin Panel</h1>
+      <AdminPanel />
     </div>
   );
-};
+}
 
 export default Admin;
