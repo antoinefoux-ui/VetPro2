@@ -1,9 +1,16 @@
 import { Router } from 'express';
-import { authMiddleware } from '../middleware/auth.middleware';
+import { authenticate } from '../middleware/auth.middleware';
+import * as appointmentController from '../controllers/appointment.controller';
 
 const router = Router();
-router.use(authMiddleware);
 
-router.get('/', (req, res) => res.json({ message: 'Route working' }));
+// Public route for dashboard stats
+router.get('/', appointmentController.getAllAppointments); // Remove authenticate
+
+// Protected routes
+router.post('/', authenticate, appointmentController.createAppointment);
+router.get('/:id', authenticate, appointmentController.getAppointmentById);
+router.put('/:id', authenticate, appointmentController.updateAppointment);
+router.delete('/:id', authenticate, appointmentController.deleteAppointment);
 
 export default router;
