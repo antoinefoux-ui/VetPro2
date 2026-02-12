@@ -689,3 +689,5 @@ export class AppointmentController {
     }
   }
 }
+
+export default AppointmentController;
