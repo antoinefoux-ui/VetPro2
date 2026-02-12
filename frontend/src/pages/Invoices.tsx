@@ -1,5 +1,5 @@
 import React from 'react';
-import InvoiceApproval from '../components/invoice/invoiceapproval';
+import InvoiceApproval from '../components/invoice/invoiceapproval.tsx';
 
 function Invoices() {
   return (
