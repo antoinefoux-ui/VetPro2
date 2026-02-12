@@ -31,6 +31,7 @@ export const prisma = new PrismaClient({
 
 // Initialize Express app
 const app = express();
+app.set('trust proxy', 1);
 const httpServer = createServer(app);
 
 // Initialize Socket.IO
