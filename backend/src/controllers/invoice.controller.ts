@@ -698,3 +698,5 @@ export class InvoiceController {
     }
   }
 }
+
+export default InvoiceController;
