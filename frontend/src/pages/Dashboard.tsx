@@ -1,4 +1,4 @@
-// Dashboard v3 - Real API data
+// Dashboard v4 - window.fetch fix deployed
 import React, { useEffect, useState } from 'react';
 import api from '../config/api';
 
