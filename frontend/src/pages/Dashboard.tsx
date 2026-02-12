@@ -25,6 +25,7 @@ function Dashboard() {
   const fetchDashboardStats = async () => {
     try {
       setLoading(true);
+      console.log('🔍 Fetching from:', api.baseURL);
       // Try to fetch real data from backend
       const clientsResponse = await api.fetch('/api/clients');
       const appointmentsResponse = await api.fetch('/api/appointments');
