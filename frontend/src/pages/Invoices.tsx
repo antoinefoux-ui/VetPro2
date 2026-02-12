@@ -1,12 +1,13 @@
 import React from 'react';
+import InvoiceApproval from '../components/invoice/invoiceapproval.tsx';
 
-const Invoices: React.FC = () => {
+function Invoices() {
   return (
     <div className="p-6">
-      <h1 className="text-3xl font-bold mb-6">Invoices</h1>
-      <p>This is the Invoices page. Content coming soon...</p>
+      <h1 className="text-2xl font-bold mb-6">Invoices</h1>
+      <InvoiceApproval />
     </div>
   );
-};
+}
 
 export default Invoices;

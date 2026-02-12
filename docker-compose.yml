@@ -1,41 +1,98 @@
 version: '3.8'
 
 services:
+  # PostgreSQL Database
   postgres:
     image: postgres:15-alpine
+    container_name: vetpro-db
     environment:
-      POSTGRES_DB: vetpro
       POSTGRES_USER: vetpro
-      POSTGRES_PASSWORD: vetpro123
+      POSTGRES_PASSWORD: vetpro_secure_password_change_me
+      POSTGRES_DB: vetpro
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U vetpro"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
+  # Redis for caching and sessions
+  redis:
+    image: redis:7-alpine
+    container_name: vetpro-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API
   backend:
     build:
       context: ./backend
-      dockerfile: ../docker/Dockerfile.backend
+      dockerfile: Dockerfile
+    container_name: vetpro-backend
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      DATABASE_URL: postgresql://vetpro:vetpro_secure_password_change_me@postgres:5432/vetpro
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      SENDGRID_API_KEY: ${SENDGRID_API_KEY}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_S3_BUCKET: ${AWS_S3_BUCKET}
+      AWS_REGION: ${AWS_REGION}
     ports:
       - "5000:5000"
-    environment:
-      DATABASE_URL: postgresql://vetpro:vetpro123@postgres:5432/vetpro
-      JWT_SECRET: your-secret-key
-      NODE_ENV: development
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
       - ./backend:/app
       - /app/node_modules
+    restart: unless-stopped
+    command: npm run dev
 
+  # Frontend Application
   frontend:
     build:
       context: ./frontend
-      dockerfile: ../docker/Dockerfile.frontend
+      dockerfile: Dockerfile
+    container_name: vetpro-frontend
+    environment:
+      VITE_API_URL: http://localhost:5000
+      VITE_SOCKET_URL: http://localhost:5000
     ports:
-      - "3000:80"
+      - "3000:3000"
     depends_on:
       - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    restart: unless-stopped
+    command: npm run dev
 
 volumes:
   postgres_data:
+  redis_data:
+
+networks:
+  default:
+    name: vetpro-network
