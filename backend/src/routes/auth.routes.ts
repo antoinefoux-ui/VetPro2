@@ -6,6 +6,8 @@ import { prisma } from '../server';
 import { AuthenticatedRequest } from '../types';
 import logger from '../utils/logger';
 
+const prismaAny = prisma as any;
+
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this';
 
@@ -35,7 +37,7 @@ router.post('/register', async (req, res) => {
     const validated = registerSchema.parse(req.body);
 
     // Check if user exists
-    const existing = await prisma.user.findUnique({
+    const existing = await prismaAny.user.findUnique({
       where: { email: validated.email },
     });
 
@@ -47,7 +49,7 @@ router.post('/register', async (req, res) => {
     const passwordHash = await bcrypt.hash(validated.password, 12);
 
     // Create user
-    const user = await prisma.user.create({
+    const user = await prismaAny.user.create({
       data: {
         email: validated.email,
         firstName: validated.firstName,
@@ -91,7 +93,7 @@ router.post('/login', async (req, res) => {
     const validated = loginSchema.parse(req.body);
 
     // Find user
-    const user = await prisma.user.findUnique({
+    const user = await prismaAny.user.findUnique({
       where: { email: validated.email },
     });
 
@@ -107,7 +109,7 @@ router.post('/login', async (req, res) => {
     }
 
     // Update last login
-    await prisma.user.update({
+    await prismaAny.user.update({
       where: { id: user.id },
       data: { lastLogin: new Date() },
     });
@@ -152,7 +154,7 @@ router.get('/me', async (req: AuthenticatedRequest, res) => {
 
     const decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
 
-    const user = await prisma.user.findUnique({
+    const user = await prismaAny.user.findUnique({
       where: { id: decoded.id },
       select: {
         id: true,

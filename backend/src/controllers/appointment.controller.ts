@@ -416,6 +416,50 @@ export class AppointmentController {
     }
   }
 
+
+
+  /**
+   * Get appointment by id
+   */
+  static async getById(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const appointment = await prisma.appointment.findUnique({
+        where: { id },
+        include: {
+          pet: true,
+          client: true,
+          vet: true,
+          visitNotes: true,
+          invoices: true,
+        },
+      });
+
+      if (!appointment) {
+        return res.status(404).json({ error: 'Appointment not found' });
+      }
+
+      res.json(appointment);
+    } catch (error) {
+      logger.error('Error fetching appointment:', error);
+      res.status(500).json({ error: 'Failed to fetch appointment' });
+    }
+  }
+
+  /**
+   * Delete appointment
+   */
+  static async delete(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      await prisma.appointment.delete({ where: { id } });
+      res.status(204).send();
+    } catch (error) {
+      logger.error('Error deleting appointment:', error);
+      res.status(500).json({ error: 'Failed to delete appointment' });
+    }
+  }
+
   /**
    * Update appointment
    */
