@@ -2,7 +2,10 @@ import { Request, Response } from 'express';
 import { prisma } from '../server';
 import { z } from 'zod';
 import logger from '../utils/logger';
+
 import { VoiceRecognitionService } from '../services/voice.service';
+
+const prismaAny = prisma as any;
 
 const createInvoiceItemSchema = z.object({
   itemType: z.enum(['service', 'product', 'medication', 'diagnostic']),
@@ -67,7 +70,7 @@ export class InvoiceController {
       }
 
       const [invoices, total] = await Promise.all([
-        prisma.invoice.findMany({
+        prismaAny.invoice.findMany({
           where,
           skip,
           take: limitNum,
@@ -90,7 +93,7 @@ export class InvoiceController {
             payments: true,
           },
         }),
-        prisma.invoice.count({ where }),
+        prismaAny.invoice.count({ where }),
       ]);
 
       res.json({
@@ -116,7 +119,7 @@ export class InvoiceController {
     try {
       const { id } = req.params;
 
-      const invoice = await prisma.invoice.findUnique({
+      const invoice = await prismaAny.invoice.findUnique({
         where: { id },
         include: {
           client: true,
@@ -167,13 +170,13 @@ export class InvoiceController {
       const { clientId, petId, appointmentId, items, notes } = req.body;
 
       // Validate client and pet
-      const client = await prisma.client.findUnique({ where: { id: clientId } });
+      const client = await prismaAny.client.findUnique({ where: { id: clientId } });
       if (!client) {
         return res.status(404).json({ error: 'Client not found' });
       }
 
       if (petId) {
-        const pet = await prisma.pet.findUnique({ where: { id: petId } });
+        const pet = await prismaAny.pet.findUnique({ where: { id: petId } });
         if (!pet || pet.clientId !== clientId) {
           return res.status(404).json({ error: 'Pet not found or does not belong to client' });
         }
@@ -204,11 +207,11 @@ export class InvoiceController {
       const totalAmount = subtotal + taxAmount;
 
       // Generate invoice number
-      const invoiceCount = await prisma.invoice.count();
+      const invoiceCount = await prismaAny.invoice.count();
       const invoiceNumber = `INV-${new Date().getFullYear()}-${String(invoiceCount + 1).padStart(6, '0')}`;
 
       // Create invoice
-      const invoice = await prisma.invoice.create({
+      const invoice = await prismaAny.invoice.create({
         data: {
           invoiceNumber,
           clientId,
@@ -250,7 +253,7 @@ export class InvoiceController {
       const validated = approveInvoiceSchema.parse(req.body);
 
       // Get current invoice
-      const currentInvoice = await prisma.invoice.findUnique({
+      const currentInvoice = await prismaAny.invoice.findUnique({
         where: { id },
         include: {
           items: {
@@ -272,7 +275,7 @@ export class InvoiceController {
       }
 
       // Start transaction for atomic operations
-      const result = await prisma.$transaction(async (tx) => {
+      const result = await prismaAny.$transaction(async (tx) => {
         
         // 1. Update invoice items if modifications were made
         if (validated.items && validated.items.length > 0) {
@@ -489,7 +492,7 @@ export class InvoiceController {
       const { appointmentId } = req.body;
 
       // Get appointment with voice recording
-      const appointment = await prisma.appointment.findUnique({
+      const appointment = await prismaAny.appointment.findUnique({
         where: { id: appointmentId },
         include: {
           voiceRecordings: {
@@ -522,7 +525,7 @@ export class InvoiceController {
         extractedData
       );
 
-      const invoice = await prisma.invoice.findUnique({
+      const invoice = await prismaAny.invoice.findUnique({
         where: { id: invoiceId },
         include: {
           items: true,
@@ -554,7 +557,7 @@ export class InvoiceController {
         notes,
       } = req.body;
 
-      const invoice = await prisma.invoice.findUnique({ where: { id } });
+      const invoice = await prismaAny.invoice.findUnique({ where: { id } });
       
       if (!invoice) {
         return res.status(404).json({ error: 'Invoice not found' });
@@ -565,7 +568,7 @@ export class InvoiceController {
       }
 
       // Create payment record
-      const payment = await prisma.payment.create({
+      const payment = await prismaAny.payment.create({
         data: {
           invoiceId: id,
           paymentMethod,
@@ -589,7 +592,7 @@ export class InvoiceController {
         newStatus = 'partially_paid';
       }
 
-      const updatedInvoice = await prisma.invoice.update({
+      const updatedInvoice = await prismaAny.invoice.update({
         where: { id },
         data: {
           amountPaid: newAmountPaid,
@@ -629,7 +632,7 @@ export class InvoiceController {
     try {
       const { id } = req.params;
 
-      const invoice = await prisma.invoice.findUnique({
+      const invoice = await prismaAny.invoice.findUnique({
         where: { id },
         include: {
           client: true,
@@ -665,7 +668,7 @@ export class InvoiceController {
     try {
       const { id } = req.params;
 
-      const invoice = await prisma.invoice.findUnique({
+      const invoice = await prismaAny.invoice.findUnique({
         where: { id },
         include: {
           client: true,
@@ -683,7 +686,7 @@ export class InvoiceController {
 
       // TODO: Send email via SendGrid
       // For now, just update status
-      await prisma.invoice.update({
+      await prismaAny.invoice.update({
         where: { id },
         data: { status: 'sent' },
       });
@@ -697,6 +700,45 @@ export class InvoiceController {
       res.status(500).json({ error: 'Failed to send invoice' });
     }
   }
+
+  /**
+   * Update invoice basic fields
+   */
+  static async update(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { notes, dueDate, status } = req.body;
+
+      const invoice = await prismaAny.invoice.update({
+        where: { id },
+        data: {
+          ...(notes !== undefined ? { notes } : {}),
+          ...(dueDate ? { dueDate: new Date(dueDate) } : {}),
+          ...(status ? { status } : {}),
+        },
+      });
+
+      res.json(invoice);
+    } catch (error) {
+      logger.error('Error updating invoice:', error);
+      res.status(500).json({ error: 'Failed to update invoice' });
+    }
+  }
+
+  /**
+   * Delete invoice
+   */
+  static async delete(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      await prismaAny.invoice.delete({ where: { id } });
+      res.status(204).send();
+    } catch (error) {
+      logger.error('Error deleting invoice:', error);
+      res.status(500).json({ error: 'Failed to delete invoice' });
+    }
+  }
+
 }
 
 export default InvoiceController;

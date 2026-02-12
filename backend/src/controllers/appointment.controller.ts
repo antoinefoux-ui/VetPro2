@@ -2,7 +2,10 @@ import { Request, Response } from 'express';
 import { prisma } from '../server';
 import { z } from 'zod';
 import logger from '../utils/logger';
+
 import { addMinutes, addHours, startOfDay, endOfDay, parseISO } from 'date-fns';
+
+const prismaAny = prisma as any;
 
 const createAppointmentSchema = z.object({
   petId: z.string().uuid(),
@@ -58,7 +61,7 @@ export class AppointmentController {
       }
 
       const [appointments, total] = await Promise.all([
-        prisma.appointment.findMany({
+        prismaAny.appointment.findMany({
           where,
           skip,
           take: limitNum,
@@ -88,7 +91,7 @@ export class AppointmentController {
             },
           },
         }),
-        prisma.appointment.count({ where }),
+        prismaAny.appointment.count({ where }),
       ]);
 
       res.json({
@@ -129,7 +132,7 @@ export class AppointmentController {
         where.assignedVetId = vetId;
       }
 
-      const appointments = await prisma.appointment.findMany({
+      const appointments = await prismaAny.appointment.findMany({
         where,
         orderBy: { scheduledStart: 'asc' },
         include: {
@@ -199,7 +202,7 @@ export class AppointmentController {
 
       // Get vet's schedule for the day
       const dayOfWeek = targetDate.getDay();
-      const schedule = await prisma.schedule.findFirst({
+      const schedule = await prismaAny.schedule.findFirst({
         where: {
           userId: vetId as string,
           dayOfWeek,
@@ -211,7 +214,7 @@ export class AppointmentController {
       }
 
       // Get existing appointments for the vet on this date
-      const existingAppointments = await prisma.appointment.findMany({
+      const existingAppointments = await prismaAny.appointment.findMany({
         where: {
           assignedVetId: vetId as string,
           scheduledStart: {
@@ -274,7 +277,7 @@ export class AppointmentController {
       const validated = createAppointmentSchema.parse(req.body);
 
       // Validate pet belongs to client
-      const pet = await prisma.pet.findUnique({ 
+      const pet = await prismaAny.pet.findUnique({ 
         where: { id: validated.petId },
         include: { client: true },
       });
@@ -288,7 +291,7 @@ export class AppointmentController {
 
       // Check for conflicts if vet is assigned
       if (validated.assignedVetId) {
-        const conflicts = await prisma.appointment.findMany({
+        const conflicts = await prismaAny.appointment.findMany({
           where: {
             assignedVetId: validated.assignedVetId,
             status: { notIn: ['cancelled', 'no_show'] },
@@ -323,7 +326,7 @@ export class AppointmentController {
         }
       }
 
-      const appointment = await prisma.appointment.create({
+      const appointment = await prismaAny.appointment.create({
         data: {
           ...validated,
           scheduledStart,
@@ -356,6 +359,50 @@ export class AppointmentController {
     }
   }
 
+
+
+  /**
+   * Get appointment by id
+   */
+  static async getById(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const appointment = await prismaAny.appointment.findUnique({
+        where: { id },
+        include: {
+          pet: true,
+          client: true,
+          vet: true,
+          visitNotes: true,
+          invoices: true,
+        },
+      });
+
+      if (!appointment) {
+        return res.status(404).json({ error: 'Appointment not found' });
+      }
+
+      res.json(appointment);
+    } catch (error) {
+      logger.error('Error fetching appointment:', error);
+      res.status(500).json({ error: 'Failed to fetch appointment' });
+    }
+  }
+
+  /**
+   * Delete appointment
+   */
+  static async delete(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      await prismaAny.appointment.delete({ where: { id } });
+      res.status(204).send();
+    } catch (error) {
+      logger.error('Error deleting appointment:', error);
+      res.status(500).json({ error: 'Failed to delete appointment' });
+    }
+  }
+
   /**
    * Update appointment
    */
@@ -364,7 +411,7 @@ export class AppointmentController {
       const { id } = req.params;
       const validated = updateAppointmentSchema.parse(req.body);
 
-      const existingAppointment = await prisma.appointment.findUnique({ 
+      const existingAppointment = await prismaAny.appointment.findUnique({ 
         where: { id },
       });
 
@@ -385,7 +432,7 @@ export class AppointmentController {
         const vetId = validated.assignedVetId || existingAppointment.assignedVetId;
 
         if (vetId) {
-          const conflicts = await prisma.appointment.findMany({
+          const conflicts = await prismaAny.appointment.findMany({
             where: {
               id: { not: id },
               assignedVetId: vetId,
@@ -416,7 +463,7 @@ export class AppointmentController {
         }
       }
 
-      const appointment = await prisma.appointment.update({
+      const appointment = await prismaAny.appointment.update({
         where: { id },
         data: {
           ...validated,
@@ -451,7 +498,7 @@ export class AppointmentController {
     try {
       const { id } = req.params;
 
-      const appointment = await prisma.appointment.update({
+      const appointment = await prismaAny.appointment.update({
         where: { id },
         data: {
           status: 'checked_in',
@@ -484,7 +531,7 @@ export class AppointmentController {
     try {
       const { id } = req.params;
 
-      const appointment = await prisma.appointment.update({
+      const appointment = await prismaAny.appointment.update({
         where: { id },
         data: {
           status: 'in_progress',
@@ -511,7 +558,7 @@ export class AppointmentController {
     try {
       const { id } = req.params;
 
-      const appointment = await prisma.appointment.update({
+      const appointment = await prismaAny.appointment.update({
         where: { id },
         data: {
           status: 'completed',
@@ -553,7 +600,7 @@ export class AppointmentController {
       const { id } = req.params;
       const { reason } = req.body;
 
-      const appointment = await prisma.appointment.update({
+      const appointment = await prismaAny.appointment.update({
         where: { id },
         data: {
           status: 'cancelled',
@@ -608,11 +655,11 @@ export class AppointmentController {
         noShow,
         byType,
       ] = await Promise.all([
-        prisma.appointment.count({ where }),
-        prisma.appointment.count({ where: { ...where, status: 'completed' } }),
-        prisma.appointment.count({ where: { ...where, status: 'cancelled' } }),
-        prisma.appointment.count({ where: { ...where, status: 'no_show' } }),
-        prisma.appointment.groupBy({
+        prismaAny.appointment.count({ where }),
+        prismaAny.appointment.count({ where: { ...where, status: 'completed' } }),
+        prismaAny.appointment.count({ where: { ...where, status: 'cancelled' } }),
+        prismaAny.appointment.count({ where: { ...where, status: 'no_show' } }),
+        prismaAny.appointment.groupBy({
           by: ['appointmentType'],
           where,
           _count: true,
@@ -646,7 +693,7 @@ export class AppointmentController {
       const tomorrow = addHours(new Date(), 24);
       const dayAfter = addHours(tomorrow, 24);
 
-      const appointments = await prisma.appointment.findMany({
+      const appointments = await prismaAny.appointment.findMany({
         where: {
           scheduledStart: {
             gte: tomorrow,
@@ -668,7 +715,7 @@ export class AppointmentController {
         // TODO: Send email/SMS reminder
         // await sendAppointmentReminder(apt);
 
-        await prisma.appointment.update({
+        await prismaAny.appointment.update({
           where: { id: apt.id },
           data: { reminderSent: true },
         });
