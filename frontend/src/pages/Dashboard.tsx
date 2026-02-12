@@ -22,23 +22,42 @@ function Dashboard() {
     fetchDashboardStats();
   }, []);
 
-  const fetchDashboardStats = async () => {
-    try {
-      setLoading(true);
-      console.log('🔍 Fetching from:', api.baseURL);
-      // Try to fetch real data from backend
-      const clientsResponse = await api.fetch('/api/clients');
-      const appointmentsResponse = await api.fetch('/api/appointments');
-      const invoicesResponse = await api.fetch('/api/invoices');
+      const fetchDashboardStats = async () => {
+  try {
+    setLoading(true);
+    console.log('🔍 Fetching from:', api.baseURL);
+    
+    // Try to fetch real data from backend
+    const clientsResponse = await api.fetch('/api/clients');
+    const appointmentsResponse = await api.fetch('/api/appointments');
+    const invoicesResponse = await api.fetch('/api/invoices');
 
-      setStats({
-        totalClients: clientsResponse?.length || 0,
-        todayAppointments: appointmentsResponse?.length || 0,
-        pendingInvoices: invoicesResponse?.filter((inv: any) => inv.status === 'pending').length || 0,
-        monthlyRevenue: 0, // Calculate from invoices if needed
-      });
-      setError(null);
-    } catch (err) {
+    console.log('📦 Clients data:', clientsResponse);
+    console.log('📦 Appointments data:', appointmentsResponse);
+    console.log('📦 Invoices data:', invoicesResponse);
+
+    setStats({
+      totalClients: clientsResponse?.data?.length || 0,
+      todayAppointments: appointmentsResponse?.data?.length || 0,
+      pendingInvoices: invoicesResponse?.data?.filter((inv: any) => inv.status === 'pending').length || 0,
+      monthlyRevenue: 0, // Calculate from invoices if needed
+    });
+    setError(null);
+  } catch (err) {
+    console.error('Error fetching dashboard stats:', err);
+    // Use mock data if API fails
+    setStats({
+      totalClients: 156,
+      todayAppointments: 12,
+      pendingInvoices: 8,
+      monthlyRevenue: 24500,
+    });
+    setError('Using demo data - backend connection issue');
+  } finally {
+    setLoading(false);
+  }
+};
+
       console.error('Error fetching dashboard stats:', err);
       // Use mock data if API fails
       setStats({
