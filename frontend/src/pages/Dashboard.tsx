@@ -32,6 +32,12 @@ function Dashboard() {
       const appointmentsResponse = await api.fetch('/api/appointments');
       const invoicesResponse = await api.fetch('/api/invoices');
 
+      console.log('📊 API Responses:', {
+        clients: clientsResponse,
+        appointments: appointmentsResponse,
+        invoices: invoicesResponse
+      });
+
       setStats({
         totalClients: clientsResponse?.data?.length || 0,
         todayAppointments: appointmentsResponse?.data?.length || 0,
@@ -39,7 +45,17 @@ function Dashboard() {
         monthlyRevenue: 0,
       });
       setError(null);
-  
+    } catch (err) {
+      console.error('❌ Error fetching dashboard stats:', err);
+      setError('Failed to connect to backend API');
+      // Show zeros instead of demo data
+      setStats({
+        totalClients: 0,
+        todayAppointments: 0,
+        pendingInvoices: 0,
+        monthlyRevenue: 0,
+      });
+    } finally {
       setLoading(false);
     }
   };
@@ -128,9 +144,9 @@ function Dashboard() {
       <div className="mt-6 bg-white rounded-xl shadow-lg border border-gray-200 p-6">
         <h2 className="text-xl font-bold text-gray-900 mb-4">System Status</h2>
         <div className="flex items-center gap-3">
-          <div className={`w-3 h-3 rounded-full ${error ? 'bg-yellow-500' : 'bg-green-500'} animate-pulse`}></div>
+          <div className={`w-3 h-3 rounded-full ${error ? 'bg-red-500' : 'bg-green-500'} animate-pulse`}></div>
           <span className="text-sm text-gray-600">
-            {error ? 'Backend: Connected (using demo data)' : 'Backend: Connected and operational'}
+            {error ? 'Backend: Connection Failed' : 'Backend: Connected and operational'}
           </span>
         </div>
         <p className="text-xs text-gray-500 mt-2">
