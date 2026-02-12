@@ -9,7 +9,7 @@ export const api = {
     const url = `${API_URL}${endpoint}`;
     console.log('🔍 API Request to:', url);
     
-    const response = await fetch(url, {
+    const response = await window.fetch(url, {  // ← CHANGED: window.fetch instead of fetch
       ...options,
       headers: {
         'Content-Type': 'application/json',
