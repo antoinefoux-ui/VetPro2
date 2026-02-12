@@ -1,14 +1,24 @@
-import { Request, Response } from 'express';
-import { prisma } from '../server';
-import { z } from 'zod';
-import logger from '../utils/logger';
-import { addMinutes, addHours, startOfDay, endOfDay, parseISO } from 'date-fns';
+import { Request, Response } from "express";
+import { prisma } from "../server";
+import { z } from "zod";
+import logger from "../utils/logger";
+
+import { addMinutes, addHours, startOfDay, endOfDay, parseISO } from "date-fns";
+
+const prismaAny = prisma as any;
 
 const createAppointmentSchema = z.object({
   petId: z.string().uuid(),
   clientId: z.string().uuid(),
   assignedVetId: z.string().uuid().optional(),
-  appointmentType: z.enum(['consultation', 'surgery', 'vaccination', 'follow_up', 'emergency', 'grooming']),
+  appointmentType: z.enum([
+    "consultation",
+    "surgery",
+    "vaccination",
+    "follow_up",
+    "emergency",
+    "grooming",
+  ]),
   scheduledStart: z.string().datetime(),
   scheduledEnd: z.string().datetime(),
   roomNumber: z.string().optional(),
@@ -19,15 +29,14 @@ const createAppointmentSchema = z.object({
 const updateAppointmentSchema = createAppointmentSchema.partial();
 
 export class AppointmentController {
-  
   /**
    * Get all appointments with advanced filtering
    */
   static async getAll(req: Request, res: Response) {
     try {
       const {
-        page = '1',
-        limit = '50',
+        page = "1",
+        limit = "50",
         vetId,
         clientId,
         petId,
@@ -58,11 +67,11 @@ export class AppointmentController {
       }
 
       const [appointments, total] = await Promise.all([
-        prisma.appointment.findMany({
+        prismaAny.appointment.findMany({
           where,
           skip,
           take: limitNum,
-          orderBy: { scheduledStart: 'asc' },
+          orderBy: { scheduledStart: "asc" },
           include: {
             pet: {
               select: {
@@ -88,7 +97,7 @@ export class AppointmentController {
             },
           },
         }),
-        prisma.appointment.count({ where }),
+        prismaAny.appointment.count({ where }),
       ]);
 
       res.json({
@@ -100,10 +109,9 @@ export class AppointmentController {
           totalPages: Math.ceil(total / limitNum),
         },
       });
-
     } catch (error) {
-      logger.error('Error fetching appointments:', error);
-      res.status(500).json({ error: 'Failed to fetch appointments' });
+      logger.error("Error fetching appointments:", error);
+      res.status(500).json({ error: "Failed to fetch appointments" });
     }
   }
 
@@ -115,7 +123,9 @@ export class AppointmentController {
       const { startDate, endDate, vetId } = req.query;
 
       if (!startDate || !endDate) {
-        return res.status(400).json({ error: 'startDate and endDate are required' });
+        return res
+          .status(400)
+          .json({ error: "startDate and endDate are required" });
       }
 
       const where: any = {
@@ -129,9 +139,9 @@ export class AppointmentController {
         where.assignedVetId = vetId;
       }
 
-      const appointments = await prisma.appointment.findMany({
+      const appointments = await prismaAny.appointment.findMany({
         where,
-        orderBy: { scheduledStart: 'asc' },
+        orderBy: { scheduledStart: "asc" },
         include: {
           pet: {
             select: {
@@ -160,14 +170,14 @@ export class AppointmentController {
 
       // Group by date and vet
       const calendar: any = {};
-      
+
       for (const apt of appointments) {
-        const date = apt.scheduledStart.toISOString().split('T')[0];
+        const date = apt.scheduledStart.toISOString().split("T")[0];
         if (!calendar[date]) {
           calendar[date] = {};
         }
 
-        const vetKey = apt.assignedVetId || 'unassigned';
+        const vetKey = apt.assignedVetId || "unassigned";
         if (!calendar[date][vetKey]) {
           calendar[date][vetKey] = [];
         }
@@ -176,10 +186,9 @@ export class AppointmentController {
       }
 
       res.json({ calendar, appointments });
-
     } catch (error) {
-      logger.error('Error fetching calendar:', error);
-      res.status(500).json({ error: 'Failed to fetch calendar' });
+      logger.error("Error fetching calendar:", error);
+      res.status(500).json({ error: "Failed to fetch calendar" });
     }
   }
 
@@ -188,10 +197,10 @@ export class AppointmentController {
    */
   static async getAvailableSlots(req: Request, res: Response) {
     try {
-      const { date, vetId, duration = '30' } = req.query;
+      const { date, vetId, duration = "30" } = req.query;
 
       if (!date || !vetId) {
-        return res.status(400).json({ error: 'date and vetId are required' });
+        return res.status(400).json({ error: "date and vetId are required" });
       }
 
       const durationMinutes = parseInt(duration as string);
@@ -199,7 +208,7 @@ export class AppointmentController {
 
       // Get vet's schedule for the day
       const dayOfWeek = targetDate.getDay();
-      const schedule = await prisma.schedule.findFirst({
+      const schedule = await prismaAny.schedule.findFirst({
         where: {
           userId: vetId as string,
           dayOfWeek,
@@ -211,26 +220,32 @@ export class AppointmentController {
       }
 
       // Get existing appointments for the vet on this date
-      const existingAppointments = await prisma.appointment.findMany({
+      const existingAppointments = await prismaAny.appointment.findMany({
         where: {
           assignedVetId: vetId as string,
           scheduledStart: {
             gte: startOfDay(targetDate),
             lte: endOfDay(targetDate),
           },
-          status: { notIn: ['cancelled', 'no_show'] },
+          status: { notIn: ["cancelled", "no_show"] },
         },
-        orderBy: { scheduledStart: 'asc' },
+        orderBy: { scheduledStart: "asc" },
       });
 
       // Generate time slots
       const slots: any[] = [];
       const startTime = new Date(targetDate);
-      const [startHour, startMin] = schedule.startTime.toString().split(':').map(Number);
+      const [startHour, startMin] = schedule.startTime
+        .toString()
+        .split(":")
+        .map(Number);
       startTime.setHours(startHour, startMin, 0, 0);
 
       const endTime = new Date(targetDate);
-      const [endHour, endMin] = schedule.endTime.toString().split(':').map(Number);
+      const [endHour, endMin] = schedule.endTime
+        .toString()
+        .split(":")
+        .map(Number);
       endTime.setHours(endHour, endMin, 0, 0);
 
       let currentSlot = new Date(startTime);
@@ -239,9 +254,10 @@ export class AppointmentController {
         const slotEnd = addMinutes(currentSlot, durationMinutes);
 
         // Check if slot conflicts with existing appointments
-        const hasConflict = existingAppointments.some(apt => {
+        const hasConflict = existingAppointments.some((apt) => {
           return (
-            (currentSlot >= apt.scheduledStart && currentSlot < apt.scheduledEnd) ||
+            (currentSlot >= apt.scheduledStart &&
+              currentSlot < apt.scheduledEnd) ||
             (slotEnd > apt.scheduledStart && slotEnd <= apt.scheduledEnd) ||
             (currentSlot <= apt.scheduledStart && slotEnd >= apt.scheduledEnd)
           );
@@ -259,10 +275,9 @@ export class AppointmentController {
       }
 
       res.json({ availableSlots: slots });
-
     } catch (error) {
-      logger.error('Error fetching available slots:', error);
-      res.status(500).json({ error: 'Failed to fetch available slots' });
+      logger.error("Error fetching available slots:", error);
+      res.status(500).json({ error: "Failed to fetch available slots" });
     }
   }
 
@@ -274,13 +289,15 @@ export class AppointmentController {
       const validated = createAppointmentSchema.parse(req.body);
 
       // Validate pet belongs to client
-      const pet = await prisma.pet.findUnique({ 
+      const pet = await prismaAny.pet.findUnique({
         where: { id: validated.petId },
         include: { client: true },
       });
 
       if (!pet || pet.clientId !== validated.clientId) {
-        return res.status(400).json({ error: 'Pet does not belong to this client' });
+        return res
+          .status(400)
+          .json({ error: "Pet does not belong to this client" });
       }
 
       const scheduledStart = parseISO(validated.scheduledStart);
@@ -288,10 +305,10 @@ export class AppointmentController {
 
       // Check for conflicts if vet is assigned
       if (validated.assignedVetId) {
-        const conflicts = await prisma.appointment.findMany({
+        const conflicts = await prismaAny.appointment.findMany({
           where: {
             assignedVetId: validated.assignedVetId,
-            status: { notIn: ['cancelled', 'no_show'] },
+            status: { notIn: ["cancelled", "no_show"] },
             OR: [
               {
                 scheduledStart: {
@@ -316,19 +333,19 @@ export class AppointmentController {
         });
 
         if (conflicts.length > 0) {
-          return res.status(409).json({ 
-            error: 'Time slot conflict detected',
+          return res.status(409).json({
+            error: "Time slot conflict detected",
             conflicts,
           });
         }
       }
 
-      const appointment = await prisma.appointment.create({
+      const appointment = await prismaAny.appointment.create({
         data: {
           ...validated,
           scheduledStart,
           scheduledEnd,
-          status: 'scheduled',
+          status: "scheduled",
         },
         include: {
           pet: true,
@@ -342,17 +359,60 @@ export class AppointmentController {
       logger.info(`Appointment created: ${appointment.id} for ${pet.name}`);
 
       // Emit real-time update
-      const io = req.app.get('io');
-      io.emit('appointment:created', appointment);
+      const io = req.app.get("io");
+      io.emit("appointment:created", appointment);
 
       res.status(201).json(appointment);
-
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ error: 'Validation error', details: error.errors });
+        return res
+          .status(400)
+          .json({ error: "Validation error", details: error.errors });
       }
-      logger.error('Error creating appointment:', error);
-      res.status(500).json({ error: 'Failed to create appointment' });
+      logger.error("Error creating appointment:", error);
+      res.status(500).json({ error: "Failed to create appointment" });
+    }
+  }
+
+  /**
+   * Get appointment by id
+   */
+  static async getById(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const appointment = await prismaAny.appointment.findUnique({
+        where: { id },
+        include: {
+          pet: true,
+          client: true,
+          vet: true,
+          visitNotes: true,
+          invoices: true,
+        },
+      });
+
+      if (!appointment) {
+        return res.status(404).json({ error: "Appointment not found" });
+      }
+
+      res.json(appointment);
+    } catch (error) {
+      logger.error("Error fetching appointment:", error);
+      res.status(500).json({ error: "Failed to fetch appointment" });
+    }
+  }
+
+  /**
+   * Delete appointment
+   */
+  static async delete(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      await prismaAny.appointment.delete({ where: { id } });
+      res.status(204).send();
+    } catch (error) {
+      logger.error("Error deleting appointment:", error);
+      res.status(500).json({ error: "Failed to delete appointment" });
     }
   }
 
@@ -364,32 +424,37 @@ export class AppointmentController {
       const { id } = req.params;
       const validated = updateAppointmentSchema.parse(req.body);
 
-      const existingAppointment = await prisma.appointment.findUnique({ 
+      const existingAppointment = await prismaAny.appointment.findUnique({
         where: { id },
       });
 
       if (!existingAppointment) {
-        return res.status(404).json({ error: 'Appointment not found' });
+        return res.status(404).json({ error: "Appointment not found" });
       }
 
       // If rescheduling, check for conflicts
-      if (validated.scheduledStart || validated.scheduledEnd || validated.assignedVetId) {
-        const scheduledStart = validated.scheduledStart 
+      if (
+        validated.scheduledStart ||
+        validated.scheduledEnd ||
+        validated.assignedVetId
+      ) {
+        const scheduledStart = validated.scheduledStart
           ? parseISO(validated.scheduledStart)
           : existingAppointment.scheduledStart;
-        
+
         const scheduledEnd = validated.scheduledEnd
           ? parseISO(validated.scheduledEnd)
           : existingAppointment.scheduledEnd;
 
-        const vetId = validated.assignedVetId || existingAppointment.assignedVetId;
+        const vetId =
+          validated.assignedVetId || existingAppointment.assignedVetId;
 
         if (vetId) {
-          const conflicts = await prisma.appointment.findMany({
+          const conflicts = await prismaAny.appointment.findMany({
             where: {
               id: { not: id },
               assignedVetId: vetId,
-              status: { notIn: ['cancelled', 'no_show'] },
+              status: { notIn: ["cancelled", "no_show"] },
               OR: [
                 {
                   scheduledStart: {
@@ -408,20 +473,24 @@ export class AppointmentController {
           });
 
           if (conflicts.length > 0) {
-            return res.status(409).json({ 
-              error: 'Time slot conflict detected',
+            return res.status(409).json({
+              error: "Time slot conflict detected",
               conflicts,
             });
           }
         }
       }
 
-      const appointment = await prisma.appointment.update({
+      const appointment = await prismaAny.appointment.update({
         where: { id },
         data: {
           ...validated,
-          ...(validated.scheduledStart && { scheduledStart: parseISO(validated.scheduledStart) }),
-          ...(validated.scheduledEnd && { scheduledEnd: parseISO(validated.scheduledEnd) }),
+          ...(validated.scheduledStart && {
+            scheduledStart: parseISO(validated.scheduledStart),
+          }),
+          ...(validated.scheduledEnd && {
+            scheduledEnd: parseISO(validated.scheduledEnd),
+          }),
         },
         include: {
           pet: true,
@@ -431,16 +500,15 @@ export class AppointmentController {
       });
 
       // Emit real-time update
-      const io = req.app.get('io');
-      io.emit('appointment:updated', appointment);
+      const io = req.app.get("io");
+      io.emit("appointment:updated", appointment);
 
       logger.info(`Appointment updated: ${id}`);
 
       res.json(appointment);
-
     } catch (error) {
-      logger.error('Error updating appointment:', error);
-      res.status(500).json({ error: 'Failed to update appointment' });
+      logger.error("Error updating appointment:", error);
+      res.status(500).json({ error: "Failed to update appointment" });
     }
   }
 
@@ -451,10 +519,10 @@ export class AppointmentController {
     try {
       const { id } = req.params;
 
-      const appointment = await prisma.appointment.update({
+      const appointment = await prismaAny.appointment.update({
         where: { id },
         data: {
-          status: 'checked_in',
+          status: "checked_in",
           actualStart: new Date(),
         },
         include: {
@@ -464,16 +532,17 @@ export class AppointmentController {
       });
 
       // Notify assigned vet
-      const io = req.app.get('io');
-      io.emit('appointment:checked-in', appointment);
+      const io = req.app.get("io");
+      io.emit("appointment:checked-in", appointment);
 
-      logger.info(`Patient checked in: ${appointment.pet.name} for appointment ${id}`);
+      logger.info(
+        `Patient checked in: ${appointment.pet.name} for appointment ${id}`,
+      );
 
       res.json(appointment);
-
     } catch (error) {
-      logger.error('Error checking in appointment:', error);
-      res.status(500).json({ error: 'Failed to check in' });
+      logger.error("Error checking in appointment:", error);
+      res.status(500).json({ error: "Failed to check in" });
     }
   }
 
@@ -484,23 +553,22 @@ export class AppointmentController {
     try {
       const { id } = req.params;
 
-      const appointment = await prisma.appointment.update({
+      const appointment = await prismaAny.appointment.update({
         where: { id },
         data: {
-          status: 'in_progress',
+          status: "in_progress",
           actualStart: new Date(),
         },
       });
 
       // Emit real-time update
-      const io = req.app.get('io');
-      io.emit('appointment:started', appointment);
+      const io = req.app.get("io");
+      io.emit("appointment:started", appointment);
 
       res.json(appointment);
-
     } catch (error) {
-      logger.error('Error starting appointment:', error);
-      res.status(500).json({ error: 'Failed to start appointment' });
+      logger.error("Error starting appointment:", error);
+      res.status(500).json({ error: "Failed to start appointment" });
     }
   }
 
@@ -511,10 +579,10 @@ export class AppointmentController {
     try {
       const { id } = req.params;
 
-      const appointment = await prisma.appointment.update({
+      const appointment = await prismaAny.appointment.update({
         where: { id },
         data: {
-          status: 'completed',
+          status: "completed",
           actualEnd: new Date(),
         },
         include: {
@@ -529,8 +597,8 @@ export class AppointmentController {
       }
 
       // Emit real-time update
-      const io = req.app.get('io');
-      io.emit('appointment:completed', appointment);
+      const io = req.app.get("io");
+      io.emit("appointment:completed", appointment);
 
       // Send follow-up communication (TODO)
       // await sendFollowUpEmail(appointment);
@@ -538,10 +606,9 @@ export class AppointmentController {
       logger.info(`Appointment completed: ${id}`);
 
       res.json(appointment);
-
     } catch (error) {
-      logger.error('Error completing appointment:', error);
-      res.status(500).json({ error: 'Failed to complete appointment' });
+      logger.error("Error completing appointment:", error);
+      res.status(500).json({ error: "Failed to complete appointment" });
     }
   }
 
@@ -553,13 +620,11 @@ export class AppointmentController {
       const { id } = req.params;
       const { reason } = req.body;
 
-      const appointment = await prisma.appointment.update({
+      const appointment = await prismaAny.appointment.update({
         where: { id },
         data: {
-          status: 'cancelled',
-          specialInstructions: reason 
-            ? `Cancelled: ${reason}` 
-            : 'Cancelled',
+          status: "cancelled",
+          specialInstructions: reason ? `Cancelled: ${reason}` : "Cancelled",
         },
         include: {
           client: true,
@@ -571,14 +636,13 @@ export class AppointmentController {
       logger.info(`Appointment cancelled: ${id}`);
 
       // Emit real-time update
-      const io = req.app.get('io');
-      io.emit('appointment:cancelled', appointment);
+      const io = req.app.get("io");
+      io.emit("appointment:cancelled", appointment);
 
       res.json(appointment);
-
     } catch (error) {
-      logger.error('Error cancelling appointment:', error);
-      res.status(500).json({ error: 'Failed to cancel appointment' });
+      logger.error("Error cancelling appointment:", error);
+      res.status(500).json({ error: "Failed to cancel appointment" });
     }
   }
 
@@ -601,19 +665,17 @@ export class AppointmentController {
         where.assignedVetId = vetId;
       }
 
-      const [
-        total,
-        completed,
-        cancelled,
-        noShow,
-        byType,
-      ] = await Promise.all([
-        prisma.appointment.count({ where }),
-        prisma.appointment.count({ where: { ...where, status: 'completed' } }),
-        prisma.appointment.count({ where: { ...where, status: 'cancelled' } }),
-        prisma.appointment.count({ where: { ...where, status: 'no_show' } }),
-        prisma.appointment.groupBy({
-          by: ['appointmentType'],
+      const [total, completed, cancelled, noShow, byType] = await Promise.all([
+        prismaAny.appointment.count({ where }),
+        prismaAny.appointment.count({
+          where: { ...where, status: "completed" },
+        }),
+        prismaAny.appointment.count({
+          where: { ...where, status: "cancelled" },
+        }),
+        prismaAny.appointment.count({ where: { ...where, status: "no_show" } }),
+        prismaAny.appointment.groupBy({
+          by: ["appointmentType"],
           where,
           _count: true,
         }),
@@ -631,10 +693,9 @@ export class AppointmentController {
           return acc;
         }, {}),
       });
-
     } catch (error) {
-      logger.error('Error fetching statistics:', error);
-      res.status(500).json({ error: 'Failed to fetch statistics' });
+      logger.error("Error fetching statistics:", error);
+      res.status(500).json({ error: "Failed to fetch statistics" });
     }
   }
 
@@ -646,13 +707,13 @@ export class AppointmentController {
       const tomorrow = addHours(new Date(), 24);
       const dayAfter = addHours(tomorrow, 24);
 
-      const appointments = await prisma.appointment.findMany({
+      const appointments = await prismaAny.appointment.findMany({
         where: {
           scheduledStart: {
             gte: tomorrow,
             lte: dayAfter,
           },
-          status: { in: ['scheduled', 'confirmed'] },
+          status: { in: ["scheduled", "confirmed"] },
           reminderSent: false,
         },
         include: {
@@ -668,7 +729,7 @@ export class AppointmentController {
         // TODO: Send email/SMS reminder
         // await sendAppointmentReminder(apt);
 
-        await prisma.appointment.update({
+        await prismaAny.appointment.update({
           where: { id: apt.id },
           data: { reminderSent: true },
         });
@@ -678,14 +739,13 @@ export class AppointmentController {
 
       logger.info(`Sent ${sentCount} appointment reminders`);
 
-      res.json({ 
+      res.json({
         message: `${sentCount} reminders sent`,
         count: sentCount,
       });
-
     } catch (error) {
-      logger.error('Error sending reminders:', error);
-      res.status(500).json({ error: 'Failed to send reminders' });
+      logger.error("Error sending reminders:", error);
+      res.status(500).json({ error: "Failed to send reminders" });
     }
   }
 }
