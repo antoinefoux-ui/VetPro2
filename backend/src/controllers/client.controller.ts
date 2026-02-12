@@ -636,3 +636,6 @@ export class ClientController {
     }
   }
 }
+
+export default ClientController;
+
