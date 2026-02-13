@@ -66,9 +66,13 @@ export const translations = {
 
 export const t = (key: string, lang: string = 'en') => {
   const keys = key.split('.');
-  let value: any = translations[lang as keyof typeof translations];
+  let value: unknown = translations[lang as keyof typeof translations];
   for (const k of keys) {
-    value = value?.[k];
+    if (value && typeof value === "object") {
+      value = (value as Record<string, unknown>)[k];
+    } else {
+      value = undefined;
+    }
   }
-  return value || key;
+  return (typeof value === "string" && value) || key;
 };

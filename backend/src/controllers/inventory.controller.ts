@@ -3,6 +3,9 @@ import { prisma } from '../server';
 import { z } from 'zod';
 import logger from '../utils/logger';
 
+const prismaAny = prisma as any;
+const db = prismaAny;
+
 const createInventoryItemSchema = z.object({
   categoryId: z.string().uuid().optional(),
   sku: z.string().optional(),
@@ -64,10 +67,8 @@ export class InventoryController {
 
       // Low stock filter
       if (lowStock === 'true') {
-        where.AND = [
-          { currentStock: { lte: prisma.inventoryItem.fields.minimumStock } },
-          { currentStock: { gt: 0 } },
-        ];
+        const lowStockIds = await this.getLowStockItemIds();
+        where.id = { in: lowStockIds };
       }
 
       // Out of stock filter
@@ -76,7 +77,7 @@ export class InventoryController {
       }
 
       const [items, total] = await Promise.all([
-        prisma.inventoryItem.findMany({
+        db.inventoryItem.findMany({
           where,
           skip,
           take: limitNum,
@@ -93,7 +94,7 @@ export class InventoryController {
             },
           },
         }),
-        prisma.inventoryItem.count({ where }),
+        db.inventoryItem.count({ where }),
       ]);
 
       // Add stock status for each item
@@ -118,13 +119,45 @@ export class InventoryController {
     }
   }
 
+
+  /**
+   * Get inventory item by id
+   */
+  static async getById(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+
+      const item = await db.inventoryItem.findUnique({
+        where: { id },
+        include: {
+          batches: {
+            orderBy: { expirationDate: 'asc' },
+          },
+          transactions: {
+            orderBy: { createdAt: 'desc' },
+            take: 25,
+          },
+        },
+      });
+
+      if (!item) {
+        return res.status(404).json({ error: 'Item not found' });
+      }
+
+      res.json(item);
+    } catch (error) {
+      logger.error('Error fetching inventory item:', error);
+      res.status(500).json({ error: 'Failed to fetch item' });
+    }
+  }
+
   /**
    * Get inventory alerts (low stock, expiring, etc.)
    */
   static async getAlerts(req: Request, res: Response) {
     try {
       // Low stock items
-      const lowStockItems = await prisma.$queryRaw`
+      const lowStockItems = await db.$queryRaw`
         SELECT * FROM inventory_items 
         WHERE current_stock <= minimum_stock 
         AND current_stock > 0
@@ -133,7 +166,7 @@ export class InventoryController {
       `;
 
       // Out of stock items
-      const outOfStockItems = await prisma.inventoryItem.findMany({
+      const outOfStockItems = await db.inventoryItem.findMany({
         where: { currentStock: 0 },
         take: 50,
       });
@@ -142,7 +175,7 @@ export class InventoryController {
       const thirtyDaysFromNow = new Date();
       thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
 
-      const expiringBatches = await prisma.inventoryBatch.findMany({
+      const expiringBatches = await db.inventoryBatch.findMany({
         where: {
           expirationDate: {
             lte: thirtyDaysFromNow,
@@ -188,7 +221,7 @@ export class InventoryController {
 
       // Check for duplicate SKU
       if (validated.sku) {
-        const existing = await prisma.inventoryItem.findUnique({
+        const existing = await db.inventoryItem.findUnique({
           where: { sku: validated.sku },
         });
 
@@ -197,7 +230,7 @@ export class InventoryController {
         }
       }
 
-      const item = await prisma.inventoryItem.create({
+      const item = await db.inventoryItem.create({
         data: validated,
       });
 
@@ -222,7 +255,7 @@ export class InventoryController {
       const { id } = req.params;
       const validated = createInventoryItemSchema.partial().parse(req.body);
 
-      const item = await prisma.inventoryItem.update({
+      const item = await db.inventoryItem.update({
         where: { id },
         data: validated,
       });
@@ -239,6 +272,23 @@ export class InventoryController {
     }
   }
 
+
+  /**
+   * Delete inventory item
+   */
+  static async delete(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+
+      await db.inventoryItem.delete({ where: { id } });
+
+      res.status(204).send();
+    } catch (error) {
+      logger.error('Error deleting inventory item:', error);
+      res.status(500).json({ error: 'Failed to delete item' });
+    }
+  }
+
   /**
    * Adjust stock manually
    */
@@ -247,7 +297,7 @@ export class InventoryController {
       const { id } = req.params;
       const { quantity, reason, notes } = req.body;
 
-      const item = await prisma.inventoryItem.findUnique({ where: { id } });
+      const item = await db.inventoryItem.findUnique({ where: { id } });
       if (!item) {
         return res.status(404).json({ error: 'Item not found' });
       }
@@ -259,12 +309,12 @@ export class InventoryController {
       }
 
       // Update stock and create transaction
-      const [updatedItem, transaction] = await prisma.$transaction([
-        prisma.inventoryItem.update({
+      const [updatedItem, transaction] = await db.$transaction([
+        db.inventoryItem.update({
           where: { id },
           data: { currentStock: newStock },
         }),
-        prisma.inventoryTransaction.create({
+        db.inventoryTransaction.create({
           data: {
             itemId: id,
             transactionType: reason || 'adjustment',
@@ -313,7 +363,7 @@ export class InventoryController {
       const skip = (pageNum - 1) * limitNum;
 
       const [transactions, total] = await Promise.all([
-        prisma.inventoryTransaction.findMany({
+        db.inventoryTransaction.findMany({
           where: { itemId: id },
           skip,
           take: limitNum,
@@ -327,7 +377,7 @@ export class InventoryController {
             },
           },
         }),
-        prisma.inventoryTransaction.count({ where: { itemId: id } }),
+        db.inventoryTransaction.count({ where: { itemId: id } }),
       ]);
 
       res.json({
@@ -354,7 +404,7 @@ export class InventoryController {
       const { supplierId, items, notes, expectedDeliveryDate } = req.body;
 
       // Generate PO number
-      const poCount = await prisma.purchaseOrder.count();
+      const poCount = await db.purchaseOrder.count();
       const poNumber = `PO-${new Date().getFullYear()}-${String(poCount + 1).padStart(6, '0')}`;
 
       // Calculate totals
@@ -371,7 +421,7 @@ export class InventoryController {
       const tax = subtotal * 0.20; // 20% VAT
       const total = subtotal + tax;
 
-      const purchaseOrder = await prisma.purchaseOrder.create({
+      const purchaseOrder = await db.purchaseOrder.create({
         data: {
           poNumber,
           supplierId,
@@ -413,7 +463,7 @@ export class InventoryController {
     try {
       const { id } = req.params;
 
-      const po = await prisma.purchaseOrder.update({
+      const po = await db.purchaseOrder.update({
         where: { id },
         data: {
           status: 'approved',
@@ -444,7 +494,7 @@ export class InventoryController {
       const { id } = req.params;
       const { items } = req.body; // Array of { itemId, quantityReceived, batchNumber, expirationDate }
 
-      const po = await prisma.purchaseOrder.findUnique({
+      const po = await db.purchaseOrder.findUnique({
         where: { id },
         include: { items: true },
       });
@@ -461,13 +511,13 @@ export class InventoryController {
         if (!poItem) continue;
 
         // Update inventory stock
-        const inventoryItem = await prisma.inventoryItem.findUnique({
+        const inventoryItem = await db.inventoryItem.findUnique({
           where: { id: receivedItem.itemId },
         });
 
         if (inventoryItem) {
           updates.push(
-            prisma.inventoryItem.update({
+            db.inventoryItem.update({
               where: { id: receivedItem.itemId },
               data: {
                 currentStock: inventoryItem.currentStock + receivedItem.quantityReceived,
@@ -477,7 +527,7 @@ export class InventoryController {
 
           // Create batch record
           updates.push(
-            prisma.inventoryBatch.create({
+            db.inventoryBatch.create({
               data: {
                 itemId: receivedItem.itemId,
                 batchNumber: receivedItem.batchNumber,
@@ -491,7 +541,7 @@ export class InventoryController {
 
           // Create inventory transaction
           updates.push(
-            prisma.inventoryTransaction.create({
+            db.inventoryTransaction.create({
               data: {
                 itemId: receivedItem.itemId,
                 transactionType: 'purchase',
@@ -508,7 +558,7 @@ export class InventoryController {
 
           // Update PO item received quantity
           updates.push(
-            prisma.purchaseOrderItem.update({
+            db.purchaseOrderItem.update({
               where: { id: poItem.id },
               data: {
                 quantityReceived: poItem.quantityReceived + receivedItem.quantityReceived,
@@ -519,10 +569,10 @@ export class InventoryController {
       }
 
       // Execute all updates in transaction
-      await prisma.$transaction(updates);
+      await db.$transaction(updates);
 
       // Update PO status
-      const updatedPO = await prisma.purchaseOrder.update({
+      const updatedPO = await db.purchaseOrder.update({
         where: { id },
         data: {
           status: 'received',
@@ -552,7 +602,7 @@ export class InventoryController {
    */
   static async getValuation(req: Request, res: Response) {
     try {
-      const items = await prisma.inventoryItem.findMany({
+      const items = await db.inventoryItem.findMany({
         select: {
           id: true,
           name: true,
@@ -608,11 +658,25 @@ export class InventoryController {
     return 'in_stock';
   }
 
+
+  private static async getLowStockItemIds(): Promise<string[]> {
+    const rows = await db.$queryRaw<Array<{ id: string }>>`
+      SELECT id
+      FROM inventory_items
+      WHERE current_stock <= minimum_stock
+        AND current_stock > 0
+    `;
+
+    return rows.map((row) => row.id);
+  }
+
   private static async identifyItemsNeedingOrders(): Promise<any[]> {
-    const items = await prisma.inventoryItem.findMany({
+    const lowStockIds = await this.getLowStockItemIds();
+
+    const items = await db.inventoryItem.findMany({
       where: {
         OR: [
-          { currentStock: { lte: prisma.inventoryItem.fields.minimumStock } },
+          { id: { in: lowStockIds } },
           { currentStock: 0 },
         ],
       },
@@ -646,7 +710,7 @@ export class InventoryController {
   private static async createAutoPurchaseOrder(item: any): Promise<void> {
     try {
       // Find preferred supplier (this would be more sophisticated in production)
-      const supplier = await prisma.supplier.findFirst({
+      const supplier = await db.supplier.findFirst({
         where: { isActive: true },
       });
 
@@ -660,14 +724,14 @@ export class InventoryController {
         : (item.minimumStock * 3);
 
       // Create draft PO
-      const poCount = await prisma.purchaseOrder.count();
+      const poCount = await db.purchaseOrder.count();
       const poNumber = `PO-${new Date().getFullYear()}-${String(poCount + 1).padStart(6, '0')}-AUTO`;
 
       const unitCost = item.costPerUnit || 0;
       const subtotal = recommendedQuantity * unitCost;
       const tax = subtotal * 0.20;
 
-      await prisma.purchaseOrder.create({
+      await db.purchaseOrder.create({
         data: {
           poNumber,
           supplierId: supplier.id,
