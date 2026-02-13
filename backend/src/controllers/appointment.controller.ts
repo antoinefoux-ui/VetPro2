@@ -342,7 +342,13 @@ export class AppointmentController {
 
       const appointment = await prisma.appointment.create({
         data: {
-          ...validated,
+          petId: validated.petId,
+          clientId: validated.clientId,
+          assignedVetId: validated.assignedVetId,
+          appointmentType: validated.appointmentType,
+          roomNumber: validated.roomNumber,
+          reason: validated.reason,
+          specialInstructions: validated.specialInstructions,
           scheduledStart,
           scheduledEnd,
           status: "scheduled",
