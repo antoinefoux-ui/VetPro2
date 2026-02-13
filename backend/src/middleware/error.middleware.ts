@@ -6,7 +6,7 @@ export function errorHandler(
   error: Error,
   req: Request,
   res: Response,
-  next: NextFunction
+  _next: NextFunction
 ): void {
   logger.error('Error occurred:', {
     message: error.message,
@@ -35,7 +35,7 @@ export function errorHandler(
 
   // Prisma errors
   if (error.name === 'PrismaClientKnownRequestError') {
-    const prismaError = error as any;
+    const prismaError = error as { code?: string; meta?: unknown };
     
     if (prismaError.code === 'P2002') {
       res.status(409).json({ error: 'Duplicate entry' });
