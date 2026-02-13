@@ -292,7 +292,7 @@ Format nicely with sections.
       const transcription = await this.transcribeAudio(data.audioFilePath);
 
       // 3. Get staff who might be in the room
-      const appointment = await prisma.appointment.findUnique({
+      const appointment: any = await prisma.appointment.findUnique({
         where: { id: data.appointmentId },
         include: {
           vet: {
@@ -354,8 +354,8 @@ Format nicely with sections.
           recordingUrl: audioUrl,
           durationSeconds,
           transcription,
-          speakerDiarization: { segments: speakerSegments },
-          aiExtractedData: extractedData,
+          speakerDiarization: { segments: speakerSegments } as any,
+          aiExtractedData: extractedData as any,
           processed: true,
         },
       });
@@ -376,7 +376,7 @@ Format nicely with sections.
           plan: extractedData.plan,
           voiceRecordingUrl: audioUrl,
           transcription,
-          aiExtractedData: extractedData,
+          aiExtractedData: extractedData as any,
           isDraft: true, // Requires vet approval
         },
       });
@@ -406,7 +406,7 @@ Format nicely with sections.
     try {
       logger.info(`Generating draft invoice for appointment ${appointmentId}`);
 
-      const appointment = await prisma.appointment.findUnique({
+      const appointment: any = await prisma.appointment.findUnique({
         where: { id: appointmentId },
         include: {
           pet: {
@@ -545,9 +545,9 @@ Format nicely with sections.
    * Real-time transcription stream (for live consultations)
    */
   static async streamTranscription(
-    audioStream: ReadableStream,
-    onTranscript: (text: string) => void,
-    onSpeakerChange: (speaker: string) => void
+    _audioStream: ReadableStream,
+    _onTranscript: (text: string) => void,
+    _onSpeakerChange: (speaker: string) => void
   ): Promise<void> {
     // This would integrate with real-time transcription services
     // Like AssemblyAI or Deepgram for streaming

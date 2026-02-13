@@ -3,6 +3,8 @@ import { prisma } from '../server';
 import { z } from 'zod';
 import logger from '../utils/logger';
 
+const prismaAny = prisma as any;
+
 const practiceSettingsSchema = z.object({
   practiceName: z.string().min(1),
   email: z.string().email(),
@@ -84,11 +86,11 @@ export class AdminSettingsController {
    */
   static async getPracticeSettings(req: Request, res: Response) {
     try {
-      let settings = await prisma.practiceSettings.findFirst();
+      let settings = await prismaAny.practiceSettings.findFirst();
 
       if (!settings) {
         // Create default settings
-        settings = await prisma.practiceSettings.create({
+        settings = await prismaAny.practiceSettings.create({
           data: {
             practiceName: 'VetPro Clinic',
             email: 'contact@vetpro.com',
@@ -128,14 +130,14 @@ export class AdminSettingsController {
     try {
       const validated = practiceSettingsSchema.partial().parse(req.body);
 
-      const settings = await prisma.practiceSettings.upsert({
+      const settings = await prismaAny.practiceSettings.upsert({
         where: { id: req.body.id || 'default' },
         update: validated,
         create: validated as any,
       });
 
       // Log audit trail
-      await prisma.auditLog.create({
+      await prismaAny.auditLog.create({
         data: {
           userId: req.user?.id,
           action: 'UPDATE_PRACTICE_SETTINGS',
@@ -173,7 +175,7 @@ export class AdminSettingsController {
       if (type) where.type = type;
       if (isActive !== undefined) where.isActive = isActive === 'true';
 
-      const rooms = await prisma.room.findMany({
+      const rooms = await prismaAny.room.findMany({
         where,
         orderBy: { name: 'asc' },
         include: {
@@ -204,11 +206,11 @@ export class AdminSettingsController {
     try {
       const validated = roomSchema.parse(req.body);
 
-      const room = await prisma.room.create({
+      const room = await prismaAny.room.create({
         data: validated,
       });
 
-      await prisma.auditLog.create({
+      await prismaAny.auditLog.create({
         data: {
           userId: req.user?.id,
           action: 'CREATE_ROOM',
@@ -241,12 +243,12 @@ export class AdminSettingsController {
       const { id } = req.params;
       const validated = roomSchema.partial().parse(req.body);
 
-      const room = await prisma.room.update({
+      const room = await prismaAny.room.update({
         where: { id },
         data: validated,
       });
 
-      await prisma.auditLog.create({
+      await prismaAny.auditLog.create({
         data: {
           userId: req.user?.id,
           action: 'UPDATE_ROOM',
@@ -276,7 +278,7 @@ export class AdminSettingsController {
       const { id } = req.params;
 
       // Check for active appointments in room
-      const activeAppointments = await prisma.appointment.count({
+      const activeAppointments = await prismaAny.appointment.count({
         where: {
           roomNumber: id,
           status: { in: ['scheduled', 'checked_in', 'in_progress'] },
@@ -289,9 +291,9 @@ export class AdminSettingsController {
         });
       }
 
-      await prisma.room.delete({ where: { id } });
+      await prismaAny.room.delete({ where: { id } });
 
-      await prisma.auditLog.create({
+      await prismaAny.auditLog.create({
         data: {
           userId: req.user?.id,
           action: 'DELETE_ROOM',
@@ -326,7 +328,7 @@ export class AdminSettingsController {
       if (type) where.type = type;
       if (roomId) where.assignedRoomId = roomId;
 
-      const equipment = await prisma.equipment.findMany({
+      const equipment = await prismaAny.equipment.findMany({
         where,
         orderBy: { name: 'asc' },
         include: {
@@ -354,7 +356,7 @@ export class AdminSettingsController {
     try {
       const validated = equipmentSchema.parse(req.body);
 
-      const equipment = await prisma.equipment.create({
+      const equipment = await prismaAny.equipment.create({
         data: {
           ...validated,
           purchaseDate: validated.purchaseDate ? new Date(validated.purchaseDate) : undefined,
@@ -364,7 +366,7 @@ export class AdminSettingsController {
         },
       });
 
-      await prisma.auditLog.create({
+      await prismaAny.auditLog.create({
         data: {
           userId: req.user?.id,
           action: 'CREATE_EQUIPMENT',
@@ -397,7 +399,7 @@ export class AdminSettingsController {
       const { id } = req.params;
       const validated = equipmentSchema.partial().parse(req.body);
 
-      const equipment = await prisma.equipment.update({
+      const equipment = await prismaAny.equipment.update({
         where: { id },
         data: {
           ...validated,
@@ -408,7 +410,7 @@ export class AdminSettingsController {
         },
       });
 
-      await prisma.auditLog.create({
+      await prismaAny.auditLog.create({
         data: {
           userId: req.user?.id,
           action: 'UPDATE_EQUIPMENT',
@@ -435,9 +437,9 @@ export class AdminSettingsController {
     try {
       const { id } = req.params;
 
-      await prisma.equipment.delete({ where: { id } });
+      await prismaAny.equipment.delete({ where: { id } });
 
-      await prisma.auditLog.create({
+      await prismaAny.auditLog.create({
         data: {
           userId: req.user?.id,
           action: 'DELETE_EQUIPMENT',
@@ -465,10 +467,10 @@ export class AdminSettingsController {
    */
   static async getEshopSettings(req: Request, res: Response) {
     try {
-      let settings = await prisma.eshopSettings.findFirst();
+      let settings = await prismaAny.eshopSettings.findFirst();
 
       if (!settings) {
-        settings = await prisma.eshopSettings.create({
+        settings = await prismaAny.eshopSettings.create({
           data: {
             enabled: true,
             storeName: 'VetPro Shop',
@@ -496,13 +498,13 @@ export class AdminSettingsController {
     try {
       const validated = eshopSettingsSchema.partial().parse(req.body);
 
-      const settings = await prisma.eshopSettings.upsert({
+      const settings = await prismaAny.eshopSettings.upsert({
         where: { id: req.body.id || 'default' },
         update: validated,
         create: validated as any,
       });
 
-      await prisma.auditLog.create({
+      await prismaAny.auditLog.create({
         data: {
           userId: req.user?.id,
           action: 'UPDATE_ESHOP_SETTINGS',
@@ -529,10 +531,10 @@ export class AdminSettingsController {
    */
   static async getPhysicalShopSettings(req: Request, res: Response) {
     try {
-      let settings = await prisma.physicalShopSettings.findFirst();
+      let settings = await prismaAny.physicalShopSettings.findFirst();
 
       if (!settings) {
-        settings = await prisma.physicalShopSettings.create({
+        settings = await prismaAny.physicalShopSettings.create({
           data: {
             enabled: true,
             location: 'Main Practice',
@@ -557,13 +559,13 @@ export class AdminSettingsController {
     try {
       const validated = physicalShopSchema.partial().parse(req.body);
 
-      const settings = await prisma.physicalShopSettings.upsert({
+      const settings = await prismaAny.physicalShopSettings.upsert({
         where: { id: req.body.id || 'default' },
         update: validated,
         create: validated as any,
       });
 
-      await prisma.auditLog.create({
+      await prismaAny.auditLog.create({
         data: {
           userId: req.user?.id,
           action: 'UPDATE_PHYSICAL_SHOP_SETTINGS',
@@ -597,18 +599,18 @@ export class AdminSettingsController {
         totalClients,
         totalPets,
       ] = await Promise.all([
-        prisma.user.count(),
-        prisma.user.count({ where: { isActive: true } }),
-        prisma.room.count(),
-        prisma.equipment.count(),
-        prisma.equipment.count({
+        prismaAny.user.count(),
+        prismaAny.user.count({ where: { isActive: true } }),
+        prismaAny.room.count(),
+        prismaAny.equipment.count(),
+        prismaAny.equipment.count({
           where: {
             nextMaintenanceDate: { lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) },
             status: 'operational',
           },
         }),
-        prisma.client.count({ where: { isActive: true } }),
-        prisma.pet.count({ where: { isDeceased: false } }),
+        prismaAny.client.count({ where: { isActive: true } }),
+        prismaAny.pet.count({ where: { isDeceased: false } }),
       ]);
 
       res.json({
