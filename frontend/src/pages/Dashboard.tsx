@@ -2,8 +2,6 @@
 import React, { useEffect, useState } from 'react';
 import api from '../config/api';
 
-type ListResponse<T> = T[] | { data?: T[] };
-
 interface InvoiceSummary {
   status: string;
 }
@@ -41,9 +39,9 @@ function Dashboard() {
       const invoices = Array.isArray(invoicesResponse) ? invoicesResponse : invoicesResponse.data;
 
       setStats({
-        totalClients: Array.isArray(clients) ? clients.length : 0,
-        todayAppointments: Array.isArray(appointments) ? appointments.length : 0,
-        pendingInvoices: Array.isArray(invoices) ? invoices.filter((inv: InvoiceSummary) => inv.status === 'pending').length : 0,
+        totalClients: clientsResponse?.data?.length || 0,
+        todayAppointments: appointmentsResponse?.data?.length || 0,
+        pendingInvoices: invoicesResponse?.data?.filter((inv: InvoiceSummary) => inv.status === 'pending').length || 0,
         monthlyRevenue: 0,
       });
       setError(null);
