@@ -1,11 +1,13 @@
-import { Request, Response } from 'express';
-import { prisma } from '../server';
-import { z } from 'zod';
-import logger from '../utils/logger';
-import { VoiceRecognitionService } from '../services/voice.service';
+import { Request, Response } from "express";
+import { prisma } from "../server";
+import { z } from "zod";
+import logger from "../utils/logger";
+
+import { VoiceRecognitionService } from "../services/voice.service";
+
 
 const createInvoiceItemSchema = z.object({
-  itemType: z.enum(['service', 'product', 'medication', 'diagnostic']),
+  itemType: z.enum(["service", "product", "medication", "diagnostic"]),
   description: z.string(),
   quantity: z.number().positive(),
   unitPrice: z.number(),
@@ -21,15 +23,14 @@ const approveInvoiceSchema = z.object({
 });
 
 export class InvoiceController {
-  
   /**
    * Get all invoices with filtering and pagination
    */
   static async getAll(req: Request, res: Response) {
     try {
       const {
-        page = '1',
-        limit = '20',
+        page = "1",
+        limit = "20",
         status,
         clientId,
         petId,
@@ -38,8 +39,8 @@ export class InvoiceController {
         search,
       } = req.query;
 
-      const pageNum = parseInt(page as string);
-      const limitNum = parseInt(limit as string);
+      const pageNum = Math.max(1, Number.parseInt(page as string, 10) || 1);
+      const limitNum = Math.min(100, Math.max(1, Number.parseInt(limit as string, 10) || 20));
       const skip = (pageNum - 1) * limitNum;
 
       const where: any = {};
@@ -57,12 +58,21 @@ export class InvoiceController {
       if (search) {
         where.OR = [
           { invoiceNumber: { contains: search as string } },
-          { client: { 
-            OR: [
-              { firstName: { contains: search as string, mode: 'insensitive' } },
-              { lastName: { contains: search as string, mode: 'insensitive' } },
-            ]
-          }},
+          {
+            client: {
+              OR: [
+                {
+                  firstName: {
+                    contains: search as string,
+                    mode: "insensitive",
+                  },
+                },
+                {
+                  lastName: { contains: search as string, mode: "insensitive" },
+                },
+              ],
+            },
+          },
         ];
       }
 
@@ -71,7 +81,7 @@ export class InvoiceController {
           where,
           skip,
           take: limitNum,
-          orderBy: { issueDate: 'desc' },
+          orderBy: { issueDate: "desc" },
           include: {
             client: {
               select: {
@@ -102,10 +112,41 @@ export class InvoiceController {
           totalPages: Math.ceil(total / limitNum),
         },
       });
-
     } catch (error) {
-      logger.error('Error fetching invoices:', error);
-      res.status(500).json({ error: 'Failed to fetch invoices' });
+      logger.error("Error fetching invoices:", error);
+
+      try {
+        const fallbackInvoices = await prisma.invoice.findMany({
+          take: 100,
+          orderBy: { issueDate: "desc" },
+          select: {
+            id: true,
+            invoiceNumber: true,
+            status: true,
+            totalAmount: true,
+            balanceDue: true,
+            dueDate: true,
+            notes: true,
+          },
+        });
+
+        return res.status(200).json({
+          data: fallbackInvoices,
+          pagination: {
+            page: 1,
+            limit: 100,
+            total: fallbackInvoices.length,
+            totalPages: 1,
+          },
+          warning: "Serving fallback invoice list due to query compatibility issue",
+        });
+      } catch (fallbackError) {
+        logger.error("Fallback invoice query failed:", fallbackError);
+        return res.status(500).json({
+          error: "Failed to fetch invoices",
+          message: "Failed to fetch invoices",
+        });
+      }
     }
   }
 
@@ -126,11 +167,7 @@ export class InvoiceController {
               visitNotes: true,
             },
           },
-          items: {
-            include: {
-              inventoryItem: true,
-            },
-          },
+          items: true,
           payments: true,
           generatedBy: {
             select: {
@@ -148,14 +185,13 @@ export class InvoiceController {
       });
 
       if (!invoice) {
-        return res.status(404).json({ error: 'Invoice not found' });
+        return res.status(404).json({ error: "Invoice not found" });
       }
 
       res.json(invoice);
-
     } catch (error) {
-      logger.error('Error fetching invoice:', error);
-      res.status(500).json({ error: 'Failed to fetch invoice' });
+      logger.error("Error fetching invoice:", error);
+      res.status(500).json({ error: "Failed to fetch invoice" });
     }
   }
 
@@ -167,15 +203,19 @@ export class InvoiceController {
       const { clientId, petId, appointmentId, items, notes } = req.body;
 
       // Validate client and pet
-      const client = await prisma.client.findUnique({ where: { id: clientId } });
+      const client = await prisma.client.findUnique({
+        where: { id: clientId },
+      });
       if (!client) {
-        return res.status(404).json({ error: 'Client not found' });
+        return res.status(404).json({ error: "Client not found" });
       }
 
       if (petId) {
         const pet = await prisma.pet.findUnique({ where: { id: petId } });
         if (!pet || pet.clientId !== clientId) {
-          return res.status(404).json({ error: 'Pet not found or does not belong to client' });
+          return res
+            .status(404)
+            .json({ error: "Pet not found or does not belong to client" });
         }
       }
 
@@ -205,7 +245,7 @@ export class InvoiceController {
 
       // Generate invoice number
       const invoiceCount = await prisma.invoice.count();
-      const invoiceNumber = `INV-${new Date().getFullYear()}-${String(invoiceCount + 1).padStart(6, '0')}`;
+      const invoiceNumber = `INV-${new Date().getFullYear()}-${String(invoiceCount + 1).padStart(6, "0")}`;
 
       // Create invoice
       const invoice = await prisma.invoice.create({
@@ -214,7 +254,7 @@ export class InvoiceController {
           clientId,
           petId,
           appointmentId,
-          status: 'draft',
+          status: "draft",
           subtotal,
           taxAmount,
           totalAmount,
@@ -230,13 +270,14 @@ export class InvoiceController {
         },
       });
 
-      logger.info(`Invoice created manually: ${invoice.id} by user ${req.user?.id}`);
+      logger.info(
+        `Invoice created manually: ${invoice.id} by user ${req.user?.id}`,
+      );
 
       res.status(201).json(invoice);
-
     } catch (error) {
-      logger.error('Error creating invoice:', error);
-      res.status(500).json({ error: 'Failed to create invoice' });
+      logger.error("Error creating invoice:", error);
+      res.status(500).json({ error: "Failed to create invoice" });
     }
   }
 
@@ -253,27 +294,27 @@ export class InvoiceController {
       const currentInvoice = await prisma.invoice.findUnique({
         where: { id },
         include: {
-          items: {
-            include: {
-              inventoryItem: true,
-            },
-          },
+          items: true,
           client: true,
           pet: true,
         },
       });
 
       if (!currentInvoice) {
-        return res.status(404).json({ error: 'Invoice not found' });
+        return res.status(404).json({ error: "Invoice not found" });
       }
 
-      if (currentInvoice.status !== 'draft' && currentInvoice.status !== 'pending_approval') {
-        return res.status(400).json({ error: 'Invoice cannot be approved in current status' });
+      if (
+        currentInvoice.status !== "draft" &&
+        currentInvoice.status !== "pending_approval"
+      ) {
+        return res
+          .status(400)
+          .json({ error: "Invoice cannot be approved in current status" });
       }
 
       // Start transaction for atomic operations
       const result = await prisma.$transaction(async (tx) => {
-        
         // 1. Update invoice items if modifications were made
         if (validated.items && validated.items.length > 0) {
           // Delete old items
@@ -291,8 +332,14 @@ export class InvoiceController {
             subtotal += itemSubtotal;
 
             return {
-              ...item,
               invoiceId: id,
+              itemType: item.itemType,
+              description: item.description,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              taxRate: item.taxRate,
+              discountPercentage: item.discountPercentage,
+              inventoryItemId: item.inventoryItemId,
               subtotal: itemSubtotal,
               total: itemTotal,
             };
@@ -341,7 +388,9 @@ export class InvoiceController {
             const newStock = inventoryItem.currentStock - item.quantity;
 
             if (newStock < 0) {
-              throw new Error(`Insufficient stock for ${inventoryItem.name}. Available: ${inventoryItem.currentStock}, Required: ${item.quantity}`);
+              throw new Error(
+                `Insufficient stock for ${inventoryItem.name}. Available: ${inventoryItem.currentStock}, Required: ${item.quantity}`,
+              );
             }
 
             // Update inventory
@@ -353,32 +402,34 @@ export class InvoiceController {
             // Create inventory transaction
             inventoryTransactions.push({
               itemId: item.inventoryItemId,
-              transactionType: 'sale',
+              transactionType: "sale",
               quantity: -item.quantity, // Negative for deduction
               unitCost: inventoryItem.costPerUnit,
               totalCost: (inventoryItem.costPerUnit || 0) * item.quantity,
-              referenceType: 'invoice',
+              referenceType: "invoice",
               referenceId: id,
               performedById: req.user?.id,
               notes: `Deducted from invoice ${currentInvoice.invoiceNumber}`,
             });
 
             // If it's a medication, generate label
-            if (item.itemType === 'medication') {
+            if (item.itemType === "medication") {
               medicationLabels.push({
                 itemId: item.inventoryItemId,
                 itemName: inventoryItem.name,
                 description: item.description,
                 quantity: item.quantity,
-                petName: currentInvoice.pet?.name || 'Unknown',
+                petName: currentInvoice.pet?.name || "Unknown",
                 ownerName: `${currentInvoice.client.firstName} ${currentInvoice.client.lastName}`,
               });
             }
 
             // Check if below minimum stock and create alert
             if (newStock <= inventoryItem.minimumStock) {
-              logger.warn(`Low stock alert: ${inventoryItem.name} (${newStock} remaining, minimum: ${inventoryItem.minimumStock})`);
-              
+              logger.warn(
+                `Low stock alert: ${inventoryItem.name} (${newStock} remaining, minimum: ${inventoryItem.minimumStock})`,
+              );
+
               // TODO: Create automatic purchase order
               // This would be implemented in the inventory service
             }
@@ -404,7 +455,7 @@ export class InvoiceController {
         const approvedInvoice = await tx.invoice.update({
           where: { id },
           data: {
-            status: 'approved',
+            status: "approved",
             approvedById: req.user?.id,
             approvedAt: new Date(),
             notes: validated.notes || currentInvoice.notes,
@@ -420,16 +471,16 @@ export class InvoiceController {
         await tx.auditLog.create({
           data: {
             userId: req.user?.id,
-            action: 'APPROVE_INVOICE',
-            entityType: 'invoice',
+            action: "APPROVE_INVOICE",
+            entityType: "invoice",
             entityId: id,
             oldValues: { status: currentInvoice.status },
-            newValues: { 
-              status: 'approved',
+            newValues: {
+              status: "approved",
               inventoryDeducted: inventoryUpdates.length,
             },
             ipAddress: req.ip,
-            userAgent: req.get('user-agent'),
+            userAgent: req.get("user-agent"),
           },
         });
 
@@ -443,41 +494,44 @@ export class InvoiceController {
       // 5. PRINT MEDICATION LABELS (After transaction)
       // This would trigger label printing
       if (result.medicationLabels.length > 0) {
-        logger.info(`Printing ${result.medicationLabels.length} medication labels`);
+        logger.info(
+          `Printing ${result.medicationLabels.length} medication labels`,
+        );
         // TODO: Integrate with label printer
         // For now, we'll emit via Socket.IO for frontend to handle
-        const io = req.app.get('io');
-        io.emit('print:medication-labels', {
+        const io = req.app.get("io");
+        io.emit("print:medication-labels", {
           invoiceId: id,
           labels: result.medicationLabels,
         });
       }
 
       // 6. Send real-time update via WebSocket
-      const io = req.app.get('io');
-      io.emit('invoice:approved', {
+      const io = req.app.get("io");
+      io.emit("invoice:approved", {
         invoiceId: id,
         inventoryUpdated: result.inventoryUpdates,
       });
 
-      logger.info(`Invoice approved: ${id} by user ${req.user?.id}. ${result.inventoryUpdates} items deducted from inventory.`);
+      logger.info(
+        `Invoice approved: ${id} by user ${req.user?.id}. ${result.inventoryUpdates} items deducted from inventory.`,
+      );
 
       res.json({
-        message: 'Invoice approved successfully',
+        message: "Invoice approved successfully",
         invoice: result.invoice,
         inventoryDeducted: result.inventoryUpdates,
         labelsGenerated: result.medicationLabels.length,
       });
-
     } catch (error: any) {
-      logger.error('Error approving invoice:', error);
-      
+      logger.error("Error approving invoice:", error);
+
       // Handle specific errors
-      if (error.message?.includes('Insufficient stock')) {
+      if (error.message?.includes("Insufficient stock")) {
         return res.status(400).json({ error: error.message });
       }
 
-      res.status(500).json({ error: 'Failed to approve invoice' });
+      res.status(500).json({ error: "Failed to approve invoice" });
     }
   }
 
@@ -494,7 +548,7 @@ export class InvoiceController {
         include: {
           voiceRecordings: {
             where: { processed: true },
-            orderBy: { createdAt: 'desc' },
+            orderBy: { createdAt: "desc" },
             take: 1,
           },
           pet: {
@@ -506,11 +560,18 @@ export class InvoiceController {
       });
 
       if (!appointment) {
-        return res.status(404).json({ error: 'Appointment not found' });
+        return res.status(404).json({ error: "Appointment not found" });
       }
 
-      if (!appointment.voiceRecordings || appointment.voiceRecordings.length === 0) {
-        return res.status(400).json({ error: 'No processed voice recording found for this appointment' });
+      if (
+        !appointment.voiceRecordings ||
+        appointment.voiceRecordings.length === 0
+      ) {
+        return res
+          .status(400)
+          .json({
+            error: "No processed voice recording found for this appointment",
+          });
       }
 
       const voiceRecording = appointment.voiceRecordings[0];
@@ -519,7 +580,7 @@ export class InvoiceController {
       // Generate invoice using AI service
       const invoiceId = await VoiceRecognitionService.generateDraftInvoice(
         appointmentId,
-        extractedData
+        extractedData,
       );
 
       const invoice = await prisma.invoice.findUnique({
@@ -529,13 +590,14 @@ export class InvoiceController {
         },
       });
 
-      logger.info(`AI-generated invoice created: ${invoiceId} for appointment ${appointmentId}`);
+      logger.info(
+        `AI-generated invoice created: ${invoiceId} for appointment ${appointmentId}`,
+      );
 
       res.status(201).json(invoice);
-
     } catch (error) {
-      logger.error('Error generating invoice from voice:', error);
-      res.status(500).json({ error: 'Failed to generate invoice' });
+      logger.error("Error generating invoice from voice:", error);
+      res.status(500).json({ error: "Failed to generate invoice" });
     }
   }
 
@@ -545,9 +607,9 @@ export class InvoiceController {
   static async recordPayment(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const { 
-        paymentMethod, 
-        amount, 
+      const {
+        paymentMethod,
+        amount,
         referenceNumber,
         ekasaReceiptNumber,
         ekasaOkpCode,
@@ -555,13 +617,19 @@ export class InvoiceController {
       } = req.body;
 
       const invoice = await prisma.invoice.findUnique({ where: { id } });
-      
+
       if (!invoice) {
-        return res.status(404).json({ error: 'Invoice not found' });
+        return res.status(404).json({ error: "Invoice not found" });
       }
 
-      if (invoice.status !== 'approved' && invoice.status !== 'sent' && invoice.status !== 'partially_paid') {
-        return res.status(400).json({ error: 'Invoice must be approved before accepting payment' });
+      if (
+        invoice.status !== "approved" &&
+        invoice.status !== "sent" &&
+        invoice.status !== "partially_paid"
+      ) {
+        return res
+          .status(400)
+          .json({ error: "Invoice must be approved before accepting payment" });
       }
 
       // Create payment record
@@ -584,9 +652,9 @@ export class InvoiceController {
 
       let newStatus = invoice.status;
       if (newBalanceDue <= 0) {
-        newStatus = 'paid';
+        newStatus = "paid";
       } else if (newAmountPaid > 0) {
-        newStatus = 'partially_paid';
+        newStatus = "partially_paid";
       }
 
       const updatedInvoice = await prisma.invoice.update({
@@ -602,8 +670,8 @@ export class InvoiceController {
       });
 
       // Emit payment notification
-      const io = req.app.get('io');
-      io.emit('payment:recorded', {
+      const io = req.app.get("io");
+      io.emit("payment:recorded", {
         invoiceId: id,
         amount,
         balanceDue: newBalanceDue,
@@ -615,10 +683,9 @@ export class InvoiceController {
         payment,
         invoice: updatedInvoice,
       });
-
     } catch (error) {
-      logger.error('Error recording payment:', error);
-      res.status(500).json({ error: 'Failed to record payment' });
+      logger.error("Error recording payment:", error);
+      res.status(500).json({ error: "Failed to record payment" });
     }
   }
 
@@ -640,7 +707,7 @@ export class InvoiceController {
       });
 
       if (!invoice) {
-        return res.status(404).json({ error: 'Invoice not found' });
+        return res.status(404).json({ error: "Invoice not found" });
       }
 
       // TODO: Generate PDF using a library like PDFKit or puppeteer
@@ -648,13 +715,12 @@ export class InvoiceController {
       logger.info(`PDF generation requested for invoice ${id}`);
 
       res.json({
-        message: 'PDF generation not yet implemented',
+        message: "PDF generation not yet implemented",
         invoice,
       });
-
     } catch (error) {
-      logger.error('Error generating PDF:', error);
-      res.status(500).json({ error: 'Failed to generate PDF' });
+      logger.error("Error generating PDF:", error);
+      res.status(500).json({ error: "Failed to generate PDF" });
     }
   }
 
@@ -674,27 +740,68 @@ export class InvoiceController {
       });
 
       if (!invoice) {
-        return res.status(404).json({ error: 'Invoice not found' });
+        return res.status(404).json({ error: "Invoice not found" });
       }
 
       if (!invoice.client.email) {
-        return res.status(400).json({ error: 'Client does not have an email address' });
+        return res
+          .status(400)
+          .json({ error: "Client does not have an email address" });
       }
 
       // TODO: Send email via SendGrid
       // For now, just update status
       await prisma.invoice.update({
         where: { id },
-        data: { status: 'sent' },
+        data: { status: "sent" },
       });
 
-      logger.info(`Invoice sent to ${invoice.client.email}: ${invoice.invoiceNumber}`);
+      logger.info(
+        `Invoice sent to ${invoice.client.email}: ${invoice.invoiceNumber}`,
+      );
 
-      res.json({ message: 'Invoice sent successfully' });
-
+      res.json({ message: "Invoice sent successfully" });
     } catch (error) {
-      logger.error('Error sending invoice:', error);
-      res.status(500).json({ error: 'Failed to send invoice' });
+      logger.error("Error sending invoice:", error);
+      res.status(500).json({ error: "Failed to send invoice" });
+    }
+  }
+
+  /**
+   * Update invoice basic fields
+   */
+  static async update(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { notes, dueDate, status } = req.body;
+
+      const invoice = await prisma.invoice.update({
+        where: { id },
+        data: {
+          ...(notes !== undefined ? { notes } : {}),
+          ...(dueDate ? { dueDate: new Date(dueDate) } : {}),
+          ...(status ? { status } : {}),
+        },
+      });
+
+      res.json(invoice);
+    } catch (error) {
+      logger.error("Error updating invoice:", error);
+      res.status(500).json({ error: "Failed to update invoice" });
+    }
+  }
+
+  /**
+   * Delete invoice
+   */
+  static async delete(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      await prisma.invoice.delete({ where: { id } });
+      res.status(204).send();
+    } catch (error) {
+      logger.error("Error deleting invoice:", error);
+      res.status(500).json({ error: "Failed to delete invoice" });
     }
   }
 }
