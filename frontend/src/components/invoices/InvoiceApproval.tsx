@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { CheckCircle, XCircle, Edit2, Trash2, Plus, Printer, Send, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { CheckCircle, Edit2, Trash2, Plus, Printer, Send, AlertTriangle } from 'lucide-react';
 import { t } from '../../locales/translations';
 
 interface InvoiceItem {
@@ -46,11 +46,7 @@ export const InvoiceApproval: React.FC<{ invoiceId: string; language?: string }>
   const [approving, setApproving] = useState(false);
   const [notes, setNotes] = useState('');
 
-  useEffect(() => {
-    fetchInvoice();
-  }, [invoiceId]);
-
-  const fetchInvoice = async () => {
+  const fetchInvoice = useCallback(async () => {
     setLoading(true);
     try {
       const response = await fetch(`/api/invoices/${invoiceId}`);
@@ -62,7 +58,11 @@ export const InvoiceApproval: React.FC<{ invoiceId: string; language?: string }>
     } finally {
       setLoading(false);
     }
-  };
+  }, [invoiceId]);
+
+  useEffect(() => {
+    fetchInvoice();
+  }, [fetchInvoice]);
 
   const handleApprove = async () => {
     if (!window.confirm(t('invoice.confirmApproval', language))) {
@@ -114,7 +114,7 @@ export const InvoiceApproval: React.FC<{ invoiceId: string; language?: string }>
     setEditing(true);
   };
 
-  const updateItem = (index: number, field: keyof InvoiceItem, value: any) => {
+  const updateItem = (index: number, field: keyof InvoiceItem, value: string | number | undefined) => {
     const newItems = [...items];
     newItems[index] = { ...newItems[index], [field]: value };
     

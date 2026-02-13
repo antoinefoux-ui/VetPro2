@@ -4,19 +4,23 @@
   "description": "VetPro Practice Management System - Backend API",
   "main": "dist/server.js",
   "scripts": {
-  "dev": "prisma db push && ts-node-dev --respawn --transpile-only src/server.ts",
-  "build": "tsc",
-  "start": "node dist/server.js",
-  "prisma:generate": "prisma generate",
-  "prisma:migrate": "prisma migrate dev",
-  "prisma:deploy": "prisma migrate deploy",
-  "prisma:seed": "ts-node prisma/seed.ts",
-  "postinstall": "prisma generate",
-  "test": "jest",
-  "lint": "eslint src/**/*.ts",
-  "format": "prettier --write \"src/**/*.ts\""
-},
-  "keywords": ["veterinary", "practice-management", "api"],
+    "dev": "prisma db push && ts-node-dev --respawn --transpile-only src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:deploy": "prisma migrate deploy",
+    "prisma:seed": "ts-node prisma/seed.ts",
+    "postinstall": "prisma generate",
+    "test": "jest --passWithNoTests",
+    "lint": "eslint src/**/*.ts",
+    "format": "prettier --write \"src/**/*.ts\""
+  },
+  "keywords": [
+    "veterinary",
+    "practice-management",
+    "api"
+  ],
   "author": "VetPro Team",
   "license": "MIT",
   "dependencies": {

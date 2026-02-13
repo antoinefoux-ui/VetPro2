@@ -1,4 +1,11 @@
-import { Request } from 'express';
+import { Request } from "express";
+
+export interface JwtUserPayload {
+  id: string;
+  email: string;
+  role: string;
+  permissions?: string[];
+}
 
 export interface AuthenticatedRequest extends Request {
   user?: {
@@ -9,11 +16,24 @@ export interface AuthenticatedRequest extends Request {
   };
 }
 
+declare global {
+  namespace Express {
+    interface Request {
+      user?: {
+        id: string;
+        email: string;
+        role: string;
+        permissions: string[];
+      };
+    }
+  }
+}
+
 export interface PaginationQuery {
   page?: string;
   limit?: string;
   sortBy?: string;
-  sortOrder?: 'asc' | 'desc';
+  sortOrder?: "asc" | "desc";
 }
 
 export interface ApiResponse<T> {
