@@ -5,7 +5,6 @@ import logger from "../utils/logger";
 
 import { VoiceRecognitionService } from "../services/voice.service";
 
-const prismaAny = prisma as any;
 
 const createInvoiceItemSchema = z.object({
   itemType: z.enum(["service", "product", "medication", "diagnostic"]),
@@ -78,7 +77,7 @@ export class InvoiceController {
       }
 
       const [invoices, total] = await Promise.all([
-        prismaAny.invoice.findMany({
+        prisma.invoice.findMany({
           where,
           skip,
           take: limitNum,
@@ -101,7 +100,7 @@ export class InvoiceController {
             payments: true,
           },
         }),
-        prismaAny.invoice.count({ where }),
+        prisma.invoice.count({ where }),
       ]);
 
       res.json({
@@ -126,7 +125,7 @@ export class InvoiceController {
     try {
       const { id } = req.params;
 
-      const invoice = await prismaAny.invoice.findUnique({
+      const invoice = await prisma.invoice.findUnique({
         where: { id },
         include: {
           client: true,
@@ -176,7 +175,7 @@ export class InvoiceController {
       const { clientId, petId, appointmentId, items, notes } = req.body;
 
       // Validate client and pet
-      const client = await prismaAny.client.findUnique({
+      const client = await prisma.client.findUnique({
         where: { id: clientId },
       });
       if (!client) {
@@ -184,7 +183,7 @@ export class InvoiceController {
       }
 
       if (petId) {
-        const pet = await prismaAny.pet.findUnique({ where: { id: petId } });
+        const pet = await prisma.pet.findUnique({ where: { id: petId } });
         if (!pet || pet.clientId !== clientId) {
           return res
             .status(404)
@@ -217,11 +216,11 @@ export class InvoiceController {
       const totalAmount = subtotal + taxAmount;
 
       // Generate invoice number
-      const invoiceCount = await prismaAny.invoice.count();
+      const invoiceCount = await prisma.invoice.count();
       const invoiceNumber = `INV-${new Date().getFullYear()}-${String(invoiceCount + 1).padStart(6, "0")}`;
 
       // Create invoice
-      const invoice = await prismaAny.invoice.create({
+      const invoice = await prisma.invoice.create({
         data: {
           invoiceNumber,
           clientId,
@@ -264,7 +263,7 @@ export class InvoiceController {
       const validated = approveInvoiceSchema.parse(req.body);
 
       // Get current invoice
-      const currentInvoice = await prismaAny.invoice.findUnique({
+      const currentInvoice = await prisma.invoice.findUnique({
         where: { id },
         include: {
           items: {
@@ -291,7 +290,7 @@ export class InvoiceController {
       }
 
       // Start transaction for atomic operations
-      const result = await prismaAny.$transaction(async (tx) => {
+      const result = await prisma.$transaction(async (tx) => {
         // 1. Update invoice items if modifications were made
         if (validated.items && validated.items.length > 0) {
           // Delete old items
@@ -514,7 +513,7 @@ export class InvoiceController {
       const { appointmentId } = req.body;
 
       // Get appointment with voice recording
-      const appointment = await prismaAny.appointment.findUnique({
+      const appointment = await prisma.appointment.findUnique({
         where: { id: appointmentId },
         include: {
           voiceRecordings: {
@@ -554,7 +553,7 @@ export class InvoiceController {
         extractedData,
       );
 
-      const invoice = await prismaAny.invoice.findUnique({
+      const invoice = await prisma.invoice.findUnique({
         where: { id: invoiceId },
         include: {
           items: true,
@@ -587,7 +586,7 @@ export class InvoiceController {
         notes,
       } = req.body;
 
-      const invoice = await prismaAny.invoice.findUnique({ where: { id } });
+      const invoice = await prisma.invoice.findUnique({ where: { id } });
 
       if (!invoice) {
         return res.status(404).json({ error: "Invoice not found" });
@@ -604,7 +603,7 @@ export class InvoiceController {
       }
 
       // Create payment record
-      const payment = await prismaAny.payment.create({
+      const payment = await prisma.payment.create({
         data: {
           invoiceId: id,
           paymentMethod,
@@ -628,7 +627,7 @@ export class InvoiceController {
         newStatus = "partially_paid";
       }
 
-      const updatedInvoice = await prismaAny.invoice.update({
+      const updatedInvoice = await prisma.invoice.update({
         where: { id },
         data: {
           amountPaid: newAmountPaid,
@@ -667,7 +666,7 @@ export class InvoiceController {
     try {
       const { id } = req.params;
 
-      const invoice = await prismaAny.invoice.findUnique({
+      const invoice = await prisma.invoice.findUnique({
         where: { id },
         include: {
           client: true,
@@ -702,7 +701,7 @@ export class InvoiceController {
     try {
       const { id } = req.params;
 
-      const invoice = await prismaAny.invoice.findUnique({
+      const invoice = await prisma.invoice.findUnique({
         where: { id },
         include: {
           client: true,
@@ -722,7 +721,7 @@ export class InvoiceController {
 
       // TODO: Send email via SendGrid
       // For now, just update status
-      await prismaAny.invoice.update({
+      await prisma.invoice.update({
         where: { id },
         data: { status: "sent" },
       });
@@ -746,7 +745,7 @@ export class InvoiceController {
       const { id } = req.params;
       const { notes, dueDate, status } = req.body;
 
-      const invoice = await prismaAny.invoice.update({
+      const invoice = await prisma.invoice.update({
         where: { id },
         data: {
           ...(notes !== undefined ? { notes } : {}),
@@ -768,7 +767,7 @@ export class InvoiceController {
   static async delete(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      await prismaAny.invoice.delete({ where: { id } });
+      await prisma.invoice.delete({ where: { id } });
       res.status(204).send();
     } catch (error) {
       logger.error("Error deleting invoice:", error);
