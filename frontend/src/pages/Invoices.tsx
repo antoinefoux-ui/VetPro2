@@ -1,8 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import api from '../config/api';
 
-type InvoiceListResponse = InvoiceRow[] | { data?: InvoiceRow[] };
-
 interface InvoiceRow {
   id: string;
   invoiceNumber: string;
@@ -30,19 +28,14 @@ function Invoices() {
   });
   const [error, setError] = useState('');
 
-  const formatCurrency = (value: unknown) => {
-    const parsed = typeof value === 'number' ? value : Number(value);
-    return Number.isFinite(parsed) ? parsed.toFixed(2) : '0.00';
-  };
-
   const token = localStorage.getItem('token');
   const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
 
   useEffect(() => {
     const load = async () => {
       try {
-        const response = await api.fetch<InvoiceListResponse>('/api/invoices');
-        const data = Array.isArray(response) ? response : response.data;
+        const response = await api.fetch('/api/invoices');
+        const data = (response.data ?? response) as InvoiceRow[];
         setRows(Array.isArray(data) ? data : []);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load invoices');
@@ -54,7 +47,7 @@ function Invoices() {
   const createInvoice = async (e: FormEvent) => {
     e.preventDefault();
     try {
-      const created = await api.fetch<InvoiceRow>('/api/invoices', {
+      const created = await api.fetch('/api/invoices', {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify({
@@ -87,7 +80,7 @@ function Invoices() {
   const saveEdit = async () => {
     if (!editingId) return;
     try {
-      const updated = await api.fetch<Partial<InvoiceRow>>(`/api/invoices/${editingId}`, {
+      const updated = await api.fetch(`/api/invoices/${editingId}`, {
         method: 'PUT',
         headers: authHeaders,
         body: JSON.stringify(draft),
@@ -102,10 +95,11 @@ function Invoices() {
 
   const removeRow = async (id: string) => {
     try {
-      await api.fetch<void>(`/api/invoices/${id}`, {
+      const response = await fetch(`${api.baseURL}/api/invoices/${id}`, {
         method: 'DELETE',
-        headers: authHeaders,
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
       });
+      if (!response.ok) throw new Error('Delete failed');
       setRows((prev) => prev.filter((item) => item.id !== id));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete invoice');
@@ -134,8 +128,8 @@ function Invoices() {
               <tr key={row.id} className="border-t">
                 <td className="p-2">{row.invoiceNumber}</td>
                 <td className="p-2">{editingId === row.id ? <input className="border rounded px-2 py-1" value={draft.status ?? ''} onChange={(e) => setDraft((d) => ({ ...d, status: e.target.value }))} /> : row.status}</td>
-                <td className="p-2">€{formatCurrency(row.totalAmount)}</td>
-                <td className="p-2">€{formatCurrency(row.balanceDue)}</td>
+                <td className="p-2">€{row.totalAmount?.toFixed(2)}</td>
+                <td className="p-2">€{row.balanceDue?.toFixed(2)}</td>
                 <td className="p-2">{editingId === row.id ? <input className="border rounded px-2 py-1" type="date" value={draft.dueDate ? String(draft.dueDate).slice(0, 10) : ''} onChange={(e) => setDraft((d) => ({ ...d, dueDate: e.target.value }))} /> : row.dueDate ? new Date(row.dueDate).toLocaleDateString() : '-'}</td>
                 <td className="p-2">{editingId === row.id ? <input className="border rounded px-2 py-1" value={draft.notes ?? ''} onChange={(e) => setDraft((d) => ({ ...d, notes: e.target.value }))} /> : row.notes || '-'}</td>
                 <td className="p-2 flex gap-2">{editingId === row.id ? <><button onClick={saveEdit} className="px-2 py-1 bg-green-600 text-white rounded">Save</button><button onClick={() => setEditingId(null)} className="px-2 py-1 border rounded">Cancel</button></> : <><button onClick={() => startEdit(row)} className="px-2 py-1 bg-blue-600 text-white rounded">Edit</button><button onClick={() => removeRow(row.id)} className="px-2 py-1 bg-red-600 text-white rounded">Delete</button></>}</td>
