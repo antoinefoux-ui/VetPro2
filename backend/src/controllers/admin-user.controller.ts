@@ -4,7 +4,6 @@ import { z } from 'zod';
 import bcrypt from 'bcrypt';
 import logger from '../utils/logger';
 
-const prismaAny = prisma as any;
 
 const createUserSchema = z.object({
   email: z.string().email(),
@@ -66,7 +65,7 @@ export class AdminUserController {
       }
 
       const [users, total] = await Promise.all([
-        prismaAny.user.findMany({
+        prisma.user.findMany({
           where,
           skip,
           take: limitNum,
@@ -92,7 +91,7 @@ export class AdminUserController {
             },
           },
         }),
-        prismaAny.user.count({ where }),
+        prisma.user.count({ where }),
       ]);
 
       res.json({
@@ -118,7 +117,7 @@ export class AdminUserController {
     try {
       const { id } = req.params;
 
-      const user = await prismaAny.user.findUnique({
+      const user = await prisma.user.findUnique({
         where: { id },
         include: {
           schedules: true,
@@ -167,7 +166,7 @@ export class AdminUserController {
       const validated = createUserSchema.parse(req.body);
 
       // Check if email already exists
-      const existingUser = await prismaAny.user.findUnique({
+      const existingUser = await prisma.user.findUnique({
         where: { email: validated.email },
       });
 
@@ -180,7 +179,7 @@ export class AdminUserController {
 
       // Create user
       const { password, ...userData } = validated;
-      const user = await prismaAny.user.create({
+      const user = await prisma.user.create({
         data: {
           ...userData,
           passwordHash,
@@ -198,7 +197,7 @@ export class AdminUserController {
       });
 
       // Log audit trail
-      await prismaAny.auditLog.create({
+      await prisma.auditLog.create({
         data: {
           userId: req.user?.id,
           action: 'CREATE_USER',
@@ -231,14 +230,14 @@ export class AdminUserController {
       const { id } = req.params;
       const validated = updateUserSchema.parse(req.body);
 
-      const oldUser = await prismaAny.user.findUnique({ where: { id } });
+      const oldUser = await prisma.user.findUnique({ where: { id } });
       if (!oldUser) {
         return res.status(404).json({ error: 'User not found' });
       }
 
       // If email is being changed, check for duplicates
       if (validated.email && validated.email !== oldUser.email) {
-        const existingEmail = await prismaAny.user.findUnique({
+        const existingEmail = await prisma.user.findUnique({
           where: { email: validated.email },
         });
 
@@ -247,7 +246,7 @@ export class AdminUserController {
         }
       }
 
-      const user = await prismaAny.user.update({
+      const user = await prisma.user.update({
         where: { id },
         data: validated,
         select: {
@@ -266,7 +265,7 @@ export class AdminUserController {
       });
 
       // Log audit trail
-      await prismaAny.auditLog.create({
+      await prisma.auditLog.create({
         data: {
           userId: req.user?.id,
           action: 'UPDATE_USER',
@@ -304,13 +303,13 @@ export class AdminUserController {
         return res.status(400).json({ error: 'Cannot delete your own account' });
       }
 
-      const user = await prismaAny.user.update({
+      const user = await prisma.user.update({
         where: { id },
         data: { isActive: false },
       });
 
       // Log audit trail
-      await prismaAny.auditLog.create({
+      await prisma.auditLog.create({
         data: {
           userId: req.user?.id,
           action: 'DELETE_USER',
@@ -350,13 +349,13 @@ export class AdminUserController {
         return res.status(400).json({ error: 'Cannot delete your own account' });
       }
 
-      const user = await prismaAny.user.findUnique({ where: { id } });
+      const user = await prisma.user.findUnique({ where: { id } });
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
 
       // Check for dependencies
-      const appointmentCount = await prismaAny.appointment.count({
+      const appointmentCount = await prisma.appointment.count({
         where: { assignedVetId: id },
       });
 
@@ -367,10 +366,10 @@ export class AdminUserController {
       }
 
       // Delete user
-      await prismaAny.user.delete({ where: { id } });
+      await prisma.user.delete({ where: { id } });
 
       // Log audit trail
-      await prismaAny.auditLog.create({
+      await prisma.auditLog.create({
         data: {
           userId: req.user?.id,
           action: 'PERMANENT_DELETE_USER',
@@ -400,7 +399,7 @@ export class AdminUserController {
       const { id } = req.params;
       const validated = updatePasswordSchema.parse(req.body);
 
-      const user = await prismaAny.user.findUnique({ where: { id } });
+      const user = await prisma.user.findUnique({ where: { id } });
       if (!user) {
         return res.status(404).json({ error: 'User not found' });
       }
@@ -416,13 +415,13 @@ export class AdminUserController {
       // Hash new password
       const newPasswordHash = await bcrypt.hash(validated.newPassword, 12);
 
-      await prismaAny.user.update({
+      await prisma.user.update({
         where: { id },
         data: { passwordHash: newPasswordHash },
       });
 
       // Log audit trail
-      await prismaAny.auditLog.create({
+      await prisma.auditLog.create({
         data: {
           userId: req.user?.id,
           action: 'UPDATE_PASSWORD',
@@ -465,7 +464,7 @@ export class AdminUserController {
         return res.status(400).json({ error: `Invalid permissions: ${invalid.join(', ')}` });
       }
 
-      const user = await prismaAny.user.update({
+      const user = await prisma.user.update({
         where: { id },
         data: { permissions },
         select: {
@@ -477,7 +476,7 @@ export class AdminUserController {
       });
 
       // Log audit trail
-      await prismaAny.auditLog.create({
+      await prisma.auditLog.create({
         data: {
           userId: req.user?.id,
           action: 'UPDATE_PERMISSIONS',
@@ -513,10 +512,10 @@ export class AdminUserController {
         approvedInvoices,
         averageRating,
       ] = await Promise.all([
-        prismaAny.appointment.count({ where: { assignedVetId: id } }),
-        prismaAny.appointment.count({ where: { assignedVetId: id, status: 'completed' } }),
-        prismaAny.invoice.count({ where: { generatedById: id } }),
-        prismaAny.invoice.count({ where: { approvedById: id } }),
+        prisma.appointment.count({ where: { assignedVetId: id } }),
+        prisma.appointment.count({ where: { assignedVetId: id, status: 'completed' } }),
+        prisma.invoice.count({ where: { generatedById: id } }),
+        prisma.invoice.count({ where: { approvedById: id } }),
         // Placeholder for rating system
         Promise.resolve(4.5),
       ]);
@@ -560,13 +559,13 @@ export class AdminUserController {
         return res.status(400).json({ error: 'Invalid role' });
       }
 
-      const result = await prismaAny.user.updateMany({
+      const result = await prisma.user.updateMany({
         where: { id: { in: userIds } },
         data: { role },
       });
 
       // Log audit trail
-      await prismaAny.auditLog.create({
+      await prisma.auditLog.create({
         data: {
           userId: req.user?.id,
           action: 'BULK_UPDATE_ROLES',
