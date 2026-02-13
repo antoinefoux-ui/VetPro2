@@ -119,6 +119,38 @@ export class InventoryController {
     }
   }
 
+
+  /**
+   * Get inventory item by id
+   */
+  static async getById(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+
+      const item = await prismaAny.inventoryItem.findUnique({
+        where: { id },
+        include: {
+          batches: {
+            orderBy: { expirationDate: 'asc' },
+          },
+          transactions: {
+            orderBy: { createdAt: 'desc' },
+            take: 25,
+          },
+        },
+      });
+
+      if (!item) {
+        return res.status(404).json({ error: 'Item not found' });
+      }
+
+      res.json(item);
+    } catch (error) {
+      logger.error('Error fetching inventory item:', error);
+      res.status(500).json({ error: 'Failed to fetch item' });
+    }
+  }
+
   /**
    * Get inventory alerts (low stock, expiring, etc.)
    */
@@ -237,6 +269,23 @@ export class InventoryController {
     } catch (error) {
       logger.error('Error updating inventory item:', error);
       res.status(500).json({ error: 'Failed to update item' });
+    }
+  }
+
+
+  /**
+   * Delete inventory item
+   */
+  static async delete(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+
+      await prismaAny.inventoryItem.delete({ where: { id } });
+
+      res.status(204).send();
+    } catch (error) {
+      logger.error('Error deleting inventory item:', error);
+      res.status(500).json({ error: 'Failed to delete item' });
     }
   }
 
