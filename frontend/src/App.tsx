@@ -3,6 +3,9 @@ import Dashboard from './pages/Dashboard'
 import Admin from './pages/Admin'
 import Eshop from './pages/Eshop'
 import Invoices from './pages/Invoices'
+import Appointments from './pages/Appointments'
+import Clients from './pages/Clients'
+import Inventory from './pages/Inventory'
 
 function App() {
   return (
@@ -20,6 +23,15 @@ function App() {
                 <Link to="/admin" className="text-blue-600 hover:text-blue-800">
                   Admin
                 </Link>
+                <Link to="/appointments" className="text-blue-600 hover:text-blue-800">
+                  Appointments
+                </Link>
+                <Link to="/clients" className="text-blue-600 hover:text-blue-800">
+                  Clients
+                </Link>
+                <Link to="/inventory" className="text-blue-600 hover:text-blue-800">
+                  Inventory
+                </Link>
                 <Link to="/eshop" className="text-blue-600 hover:text-blue-800">
                   E-Shop
                 </Link>
@@ -35,6 +47,9 @@ function App() {
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/admin" element={<Admin />} />
+            <Route path="/appointments" element={<Appointments />} />
+            <Route path="/clients" element={<Clients />} />
+            <Route path="/inventory" element={<Inventory />} />
             <Route path="/eshop" element={<Eshop />} />
             <Route path="/invoices" element={<Invoices />} />
           </Routes>
