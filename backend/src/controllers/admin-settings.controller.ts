@@ -3,7 +3,6 @@ import { prisma } from '../server';
 import { z } from 'zod';
 import logger from '../utils/logger';
 
-const prismaAny = prisma as any;
 
 const practiceSettingsSchema = z.object({
   practiceName: z.string().min(1),
