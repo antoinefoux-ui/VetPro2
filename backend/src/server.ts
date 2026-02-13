@@ -34,11 +34,32 @@ const app = express();
 app.set('trust proxy', 1);
 const httpServer = createServer(app);
 
+const configuredOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const isAllowedOrigin = (origin?: string) => {
+  if (!origin) {
+    return true;
+  }
+
+  return configuredOrigins.includes(origin);
+};
+
 // Initialize Socket.IO
 const io = new SocketServer(httpServer, {
   cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: (origin, callback) => {
+      if (isAllowedOrigin(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(new Error('CORS not allowed for this origin'));
+    },
     methods: ['GET', 'POST'],
+    credentials: true,
   },
 });
 
@@ -48,7 +69,14 @@ app.set('io', io);
 // Middleware
 app.use(helmet());
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: (origin, callback) => {
+    if (isAllowedOrigin(origin)) {
+      callback(null, true);
+      return;
+    }
+
+    callback(new Error('CORS not allowed for this origin'));
+  },
   credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));
@@ -65,8 +93,24 @@ app.use('/api', limiter);
 app.use('/uploads', express.static('uploads'));
 
 // Health check
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+app.get('/health', async (req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({
+      status: 'ok',
+      database: 'connected',
+      timestamp: new Date().toISOString(),
+      allowedOrigins: configuredOrigins,
+    });
+  } catch (error) {
+    logger.error('Health check database probe failed:', error);
+    res.status(503).json({
+      status: 'degraded',
+      database: 'disconnected',
+      timestamp: new Date().toISOString(),
+      allowedOrigins: configuredOrigins,
+    });
+  }
 });
 
 // API Routes
@@ -114,6 +158,7 @@ async function startServer() {
     httpServer.listen(PORT, () => {
       logger.info(`Server running on port ${PORT}`);
       logger.info(`Environment: ${process.env.NODE_ENV || 'development'}`);
+      logger.info(`Allowed CORS origins: ${configuredOrigins.join(', ')}`);
     });
   } catch (error) {
     logger.error('Failed to start server:', error);
