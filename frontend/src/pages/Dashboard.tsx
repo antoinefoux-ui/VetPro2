@@ -30,17 +30,13 @@ function Dashboard() {
   const fetchDashboardStats = async () => {
     try {
       setLoading(true);
-      console.log('🔍 Fetching from:', api.baseURL);
-      
-      const clientsResponse = await api.fetch('/api/clients');
-      const appointmentsResponse = await api.fetch('/api/appointments');
-      const invoicesResponse = await api.fetch('/api/invoices');
+      const clientsResponse = await api.fetch<ListResponse<unknown>>('/api/clients');
+      const appointmentsResponse = await api.fetch<ListResponse<unknown>>('/api/appointments');
+      const invoicesResponse = await api.fetch<ListResponse<InvoiceSummary>>('/api/invoices');
 
-      console.log('📊 API Responses:', {
-        clients: clientsResponse,
-        appointments: appointmentsResponse,
-        invoices: invoicesResponse
-      });
+      const clients = Array.isArray(clientsResponse) ? clientsResponse : clientsResponse.data;
+      const appointments = Array.isArray(appointmentsResponse) ? appointmentsResponse : appointmentsResponse.data;
+      const invoices = Array.isArray(invoicesResponse) ? invoicesResponse : invoicesResponse.data;
 
       setStats({
         totalClients: clientsResponse?.data?.length || 0,
@@ -49,8 +45,7 @@ function Dashboard() {
         monthlyRevenue: 0,
       });
       setError(null);
-    } catch (err) {
-      console.error('❌ Error fetching dashboard stats:', err);
+    } catch {
       setError('Failed to connect to backend API');
       // Show zeros instead of demo data
       setStats({
