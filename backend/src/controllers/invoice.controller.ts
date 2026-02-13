@@ -39,8 +39,8 @@ export class InvoiceController {
         search,
       } = req.query;
 
-      const pageNum = parseInt(page as string);
-      const limitNum = parseInt(limit as string);
+      const pageNum = Math.max(1, Number.parseInt(page as string, 10) || 1);
+      const limitNum = Math.min(100, Math.max(1, Number.parseInt(limit as string, 10) || 20));
       const skip = (pageNum - 1) * limitNum;
 
       const where: any = {};
