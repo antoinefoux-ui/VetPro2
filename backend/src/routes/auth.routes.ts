@@ -1,20 +1,29 @@
-import { Router } from 'express';
-import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
-import { z } from 'zod';
-import { prisma } from '../server';
-import { AuthenticatedRequest } from '../types';
-import logger from '../utils/logger';
+import { Router } from "express";
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+import { z } from "zod";
+import { prisma } from "../server";
+import { AuthenticatedRequest, JwtUserPayload } from "../types";
+import logger from "../utils/logger";
 
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this';
+const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-this";
 
 const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
   firstName: z.string().min(1),
   lastName: z.string().min(1),
-  role: z.enum(['veterinarian', 'nurse', 'receptionist', 'shop_staff', 'student', 'admin']).default('receptionist'),
+  role: z
+    .enum([
+      "veterinarian",
+      "nurse",
+      "receptionist",
+      "shop_staff",
+      "student",
+      "admin",
+    ])
+    .default("receptionist"),
 });
 
 const loginSchema = z.object({
@@ -23,7 +32,7 @@ const loginSchema = z.object({
 });
 
 // Register
-router.post('/register', async (req, res) => {
+router.post("/register", async (req, res) => {
   try {
     const validated = registerSchema.parse(req.body);
 
@@ -33,7 +42,7 @@ router.post('/register', async (req, res) => {
     });
 
     if (existing) {
-      return res.status(400).json({ error: 'Email already registered' });
+      return res.status(400).json({ error: "Email already registered" });
     }
 
     // Hash password
@@ -42,9 +51,12 @@ router.post('/register', async (req, res) => {
     // Create user
     const user = await prisma.user.create({
       data: {
-        ...validated,
+        email: validated.email,
+        firstName: validated.firstName,
+        lastName: validated.lastName,
+        role: validated.role,
         passwordHash,
-        permissions: ['read'],
+        permissions: ["read"],
       },
       select: {
         id: true,
@@ -65,18 +77,18 @@ router.post('/register', async (req, res) => {
         permissions: user.permissions,
       },
       JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: "7d" },
     );
 
     res.status(201).json({ user, token });
   } catch (error) {
-    logger.error('Registration error:', error);
-    res.status(500).json({ error: 'Registration failed' });
+    logger.error("Registration error:", error);
+    res.status(500).json({ error: "Registration failed" });
   }
 });
 
 // Login
-router.post('/login', async (req, res) => {
+router.post("/login", async (req, res) => {
   try {
     const validated = loginSchema.parse(req.body);
 
@@ -86,14 +98,14 @@ router.post('/login', async (req, res) => {
     });
 
     if (!user || !user.isActive) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      return res.status(401).json({ error: "Invalid credentials" });
     }
 
     // Verify password
     const isValid = await bcrypt.compare(validated.password, user.passwordHash);
 
     if (!isValid) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      return res.status(401).json({ error: "Invalid credentials" });
     }
 
     // Update last login
@@ -111,7 +123,7 @@ router.post('/login', async (req, res) => {
         permissions: user.permissions,
       },
       JWT_SECRET,
-      { expiresIn: '7d' }
+      { expiresIn: "7d" },
     );
 
     res.json({
@@ -126,21 +138,21 @@ router.post('/login', async (req, res) => {
       token,
     });
   } catch (error) {
-    logger.error('Login error:', error);
-    res.status(500).json({ error: 'Login failed' });
+    logger.error("Login error:", error);
+    res.status(500).json({ error: "Login failed" });
   }
 });
 
 // Verify token
-router.get('/me', async (req: AuthenticatedRequest, res) => {
+router.get("/me", async (req: AuthenticatedRequest, res) => {
   try {
-    const token = req.headers.authorization?.replace('Bearer ', '');
+    const token = req.headers.authorization?.replace("Bearer ", "");
 
     if (!token) {
-      return res.status(401).json({ error: 'No token provided' });
+      return res.status(401).json({ error: "No token provided" });
     }
 
-    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    const decoded = jwt.verify(token, JWT_SECRET) as JwtUserPayload;
 
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
@@ -156,13 +168,13 @@ router.get('/me', async (req: AuthenticatedRequest, res) => {
     });
 
     if (!user || !user.isActive) {
-      return res.status(401).json({ error: 'Invalid token' });
+      return res.status(401).json({ error: "Invalid token" });
     }
 
     res.json({ user });
   } catch (error) {
-    logger.error('Token verification error:', error);
-    res.status(401).json({ error: 'Invalid token' });
+    logger.error("Token verification error:", error);
+    res.status(401).json({ error: "Invalid token" });
   }
 });
 

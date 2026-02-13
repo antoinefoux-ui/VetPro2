@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShoppingCart, Heart, Search, Filter, Star, Plus, Minus, Check } from 'lucide-react';
+import { ShoppingCart, Heart, Search, Star, Plus, Minus } from 'lucide-react';
 import { t } from '../../locales/translations';
 
 interface Product {
@@ -90,16 +90,6 @@ export const ECommerceShop: React.FC<{ language?: string }> = ({ language = 'en'
   const addToCart = (productId: string, quantity: number = 1) => {
     const newCart = new Map(cart);
     newCart.set(productId, (newCart.get(productId) || 0) + quantity);
-    setCart(newCart);
-  };
-
-  const updateCartQuantity = (productId: string, quantity: number) => {
-    const newCart = new Map(cart);
-    if (quantity <= 0) {
-      newCart.delete(productId);
-    } else {
-      newCart.set(productId, quantity);
-    }
     setCart(newCart);
   };
 
