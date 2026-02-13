@@ -772,6 +772,45 @@ export class InvoiceController {
       res.status(500).json({ error: "Failed to delete invoice" });
     }
   }
+
+  /**
+   * Update invoice basic fields
+   */
+  static async update(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { notes, dueDate, status } = req.body;
+
+      const invoice = await prisma.invoice.update({
+        where: { id },
+        data: {
+          ...(notes !== undefined ? { notes } : {}),
+          ...(dueDate ? { dueDate: new Date(dueDate) } : {}),
+          ...(status ? { status } : {}),
+        },
+      });
+
+      res.json(invoice);
+    } catch (error) {
+      logger.error('Error updating invoice:', error);
+      res.status(500).json({ error: 'Failed to update invoice' });
+    }
+  }
+
+  /**
+   * Delete invoice
+   */
+  static async delete(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      await prisma.invoice.delete({ where: { id } });
+      res.status(204).send();
+    } catch (error) {
+      logger.error('Error deleting invoice:', error);
+      res.status(500).json({ error: 'Failed to delete invoice' });
+    }
+  }
+
 }
 
 export default InvoiceController;
