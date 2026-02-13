@@ -30,9 +30,7 @@ export const api = {
       const message =
         typeof payload === 'object' && payload !== null && 'message' in payload
           ? String((payload as { message: string }).message)
-          : typeof payload === 'object' && payload !== null && 'error' in payload
-            ? String((payload as { error: string }).error)
-            : `API Error: ${response.status} ${response.statusText}`;
+          : `API Error: ${response.status} ${response.statusText}`;
       throw new Error(message);
     }
 

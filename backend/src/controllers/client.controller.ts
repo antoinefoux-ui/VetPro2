@@ -3,8 +3,6 @@ import { prisma } from '../server';
 import { z } from 'zod';
 import logger from '../utils/logger';
 
-const prismaAny = prisma as any;
-const db = prismaAny;
 
 // Validation schemas
 const createClientSchema = z.object({
@@ -85,7 +83,7 @@ export class ClientController {
 
       // Execute query
       const [clients, total] = await Promise.all([
-        db.client.findMany({
+        prismaAny.client.findMany({
           where,
           skip,
           take: limitNum,
@@ -107,7 +105,7 @@ export class ClientController {
             },
           },
         }),
-        db.client.count({ where }),
+        prismaAny.client.count({ where }),
       ]);
 
       res.json({
@@ -162,7 +160,7 @@ export class ClientController {
     try {
       const { id } = req.params;
 
-      const client = await db.client.findUnique({
+      const client = await prismaAny.client.findUnique({
         where: { id },
         include: {
           pets: {
@@ -230,7 +228,7 @@ export class ClientController {
       }
 
       // Calculate client lifetime value
-      const totalRevenue = await db.invoice.aggregate({
+      const totalRevenue = await prismaAny.invoice.aggregate({
         where: { 
           clientId: id,
           status: { in: ['paid', 'partially_paid'] },
@@ -257,7 +255,7 @@ export class ClientController {
       const validated = createClientSchema.parse(req.body);
 
       // Check for duplicate phone number
-      const existingClient = await db.client.findFirst({
+      const existingClient = await prismaAny.client.findFirst({
         where: {
           phonePrimary: validated.phonePrimary,
           isActive: true,
@@ -270,7 +268,7 @@ export class ClientController {
         });
       }
 
-      const client = await db.client.create({
+      const client = await prismaAny.client.create({
         data: validated,
         include: {
           pets: true,
@@ -278,7 +276,7 @@ export class ClientController {
       });
 
       // Log audit trail
-      await db.auditLog.create({
+      await prismaAny.auditLog.create({
         data: {
           userId: req.user?.id,
           action: 'CREATE_CLIENT',
@@ -310,13 +308,13 @@ export class ClientController {
       const validated = updateClientSchema.parse(req.body);
 
       // Get old values for audit
-      const oldClient = await db.client.findUnique({ where: { id } });
+      const oldClient = await prismaAny.client.findUnique({ where: { id } });
       
       if (!oldClient) {
         return res.status(404).json({ error: 'Client not found' });
       }
 
-      const client = await db.client.update({
+      const client = await prismaAny.client.update({
         where: { id },
         data: validated,
         include: {
@@ -325,7 +323,7 @@ export class ClientController {
       });
 
       // Log audit trail
-      await db.auditLog.create({
+      await prismaAny.auditLog.create({
         data: {
           userId: req.user?.id,
           action: 'UPDATE_CLIENT',
@@ -356,13 +354,13 @@ export class ClientController {
     try {
       const { id } = req.params;
 
-      const client = await db.client.update({
+      const client = await prismaAny.client.update({
         where: { id },
         data: { isActive: false },
       });
 
       // Log audit trail
-      await db.auditLog.create({
+      await prismaAny.auditLog.create({
         data: {
           userId: req.user?.id,
           action: 'DELETE_CLIENT',
@@ -398,7 +396,7 @@ export class ClientController {
       }
 
       const [communications, total] = await Promise.all([
-        db.clientCommunication.findMany({
+        prismaAny.clientCommunication.findMany({
           where,
           skip,
           take: limitNum,
@@ -412,7 +410,7 @@ export class ClientController {
             },
           },
         }),
-        db.clientCommunication.count({ where }),
+        prismaAny.clientCommunication.count({ where }),
       ]);
 
       res.json({
@@ -438,13 +436,13 @@ export class ClientController {
       const { type, subject, content, sendNow = true } = req.body;
 
       // Validate client exists
-      const client = await db.client.findUnique({ where: { id } });
+      const client = await prismaAny.client.findUnique({ where: { id } });
       if (!client) {
         return res.status(404).json({ error: 'Client not found' });
       }
 
       // Create communication record
-      const communication = await db.clientCommunication.create({
+      const communication = await prismaAny.clientCommunication.create({
         data: {
           clientId: id,
           communicationType: type,
@@ -496,21 +494,21 @@ export class ClientController {
         pets,
         lastVisit,
       ] = await Promise.all([
-        db.appointment.count({ where: { clientId: id } }),
-        db.appointment.count({ where: { clientId: id, status: 'completed' } }),
-        db.appointment.count({ where: { clientId: id, status: 'cancelled' } }),
-        db.invoice.count({ where: { clientId: id } }),
-        db.invoice.count({ where: { clientId: id, status: 'paid' } }),
-        db.invoice.aggregate({
+        prismaAny.appointment.count({ where: { clientId: id } }),
+        prismaAny.appointment.count({ where: { clientId: id, status: 'completed' } }),
+        prismaAny.appointment.count({ where: { clientId: id, status: 'cancelled' } }),
+        prismaAny.invoice.count({ where: { clientId: id } }),
+        prismaAny.invoice.count({ where: { clientId: id, status: 'paid' } }),
+        prismaAny.invoice.aggregate({
           where: { clientId: id, status: { in: ['paid', 'partially_paid'] } },
           _sum: { amountPaid: true },
         }),
-        db.invoice.aggregate({
+        prismaAny.invoice.aggregate({
           where: { clientId: id, status: { in: ['approved', 'sent', 'overdue', 'partially_paid'] } },
           _sum: { balanceDue: true },
         }),
-        db.pet.count({ where: { clientId: id, isDeceased: false } }),
-        db.appointment.findFirst({
+        prismaAny.pet.count({ where: { clientId: id, isDeceased: false } }),
+        prismaAny.appointment.findFirst({
           where: { clientId: id, status: 'completed' },
           orderBy: { scheduledStart: 'desc' },
           select: { scheduledStart: true },
@@ -553,8 +551,8 @@ export class ClientController {
 
       // Validate both clients exist
       const [sourceClient, targetClient] = await Promise.all([
-        db.client.findUnique({ where: { id: sourceId } }),
-        db.client.findUnique({ where: { id: targetId } }),
+        prismaAny.client.findUnique({ where: { id: sourceId } }),
+        prismaAny.client.findUnique({ where: { id: targetId } }),
       ]);
 
       if (!sourceClient || !targetClient) {
@@ -562,29 +560,29 @@ export class ClientController {
       }
 
       // Transfer all data to target client
-      await db.$transaction([
+      await prismaAny.$transaction([
         // Transfer pets
-        db.pet.updateMany({
+        prismaAny.pet.updateMany({
           where: { clientId: sourceId },
           data: { clientId: targetId },
         }),
         // Transfer appointments
-        db.appointment.updateMany({
+        prismaAny.appointment.updateMany({
           where: { clientId: sourceId },
           data: { clientId: targetId },
         }),
         // Transfer invoices
-        db.invoice.updateMany({
+        prismaAny.invoice.updateMany({
           where: { clientId: sourceId },
           data: { clientId: targetId },
         }),
         // Transfer communications
-        db.clientCommunication.updateMany({
+        prismaAny.clientCommunication.updateMany({
           where: { clientId: sourceId },
           data: { clientId: targetId },
         }),
         // Deactivate source client
-        db.client.update({
+        prismaAny.client.update({
           where: { id: sourceId },
           data: { 
             isActive: false,
@@ -594,7 +592,7 @@ export class ClientController {
       ]);
 
       // Log audit trail
-      await db.auditLog.create({
+      await prismaAny.auditLog.create({
         data: {
           userId: req.user?.id,
           action: 'MERGE_CLIENTS',
@@ -621,7 +619,7 @@ export class ClientController {
     try {
       const { id } = req.params;
 
-      const client = await db.client.findUnique({
+      const client = await prismaAny.client.findUnique({
         where: { id },
         include: {
           pets: {
@@ -661,7 +659,7 @@ export class ClientController {
       }
 
       // Log export for compliance
-      await db.auditLog.create({
+      await prismaAny.auditLog.create({
         data: {
           userId: req.user?.id,
           action: 'EXPORT_CLIENT_DATA',
