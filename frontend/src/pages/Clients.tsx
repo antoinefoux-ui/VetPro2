@@ -1,8 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import api from '../config/api';
 
-type ClientListResponse = ClientRow[] | { data?: ClientRow[] };
-
 interface ClientRow {
   id: string;
   firstName: string;
@@ -23,8 +21,8 @@ function Clients() {
 
   const loadClients = async () => {
     try {
-      const response = await api.fetch<ClientListResponse>('/api/clients');
-      const rows = Array.isArray(response) ? response : response.data;
+      const response = await api.fetch('/api/clients');
+      const rows = (response.data ?? response) as ClientRow[];
       setClients(Array.isArray(rows) ? rows : []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load clients');
@@ -38,7 +36,7 @@ function Clients() {
   const createClient = async (e: FormEvent) => {
     e.preventDefault();
     try {
-      const created = await api.fetch<ClientRow>('/api/clients', {
+      const created = await api.fetch('/api/clients', {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify({
@@ -63,7 +61,7 @@ function Clients() {
   const saveEdit = async () => {
     if (!editingId) return;
     try {
-      const updated = await api.fetch<Partial<ClientRow>>(`/api/clients/${editingId}`, {
+      const updated = await api.fetch(`/api/clients/${editingId}`, {
         method: 'PUT',
         headers: authHeaders,
         body: JSON.stringify(draft),
@@ -78,10 +76,16 @@ function Clients() {
 
   const removeClient = async (id: string) => {
     try {
-      await api.fetch<void>(`/api/clients/${id}`, {
+      const response = await fetch(`${api.baseURL}/api/clients/${id}`, {
         method: 'DELETE',
-        headers: authHeaders,
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders,
+        },
       });
+      if (!response.ok) {
+        throw new Error('Delete failed');
+      }
       setClients((prev) => prev.filter((item) => item.id !== id));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete client');
