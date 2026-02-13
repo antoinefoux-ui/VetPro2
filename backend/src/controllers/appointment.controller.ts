@@ -5,6 +5,7 @@ import logger from "../utils/logger";
 
 import { addMinutes, addHours, startOfDay, endOfDay, parseISO } from "date-fns";
 
+// REMOVED: const prisma = prisma as any;
 
 const createAppointmentSchema = z.object({
   petId: z.string().uuid(),
@@ -110,38 +111,7 @@ export class AppointmentController {
       });
     } catch (error) {
       logger.error("Error fetching appointments:", error);
-
-      try {
-        const fallbackAppointments = await prisma.appointment.findMany({
-          take: 100,
-          orderBy: { scheduledStart: "desc" },
-          select: {
-            id: true,
-            appointmentType: true,
-            status: true,
-            scheduledStart: true,
-            roomNumber: true,
-            reason: true,
-          },
-        });
-
-        return res.status(200).json({
-          data: fallbackAppointments,
-          pagination: {
-            page: 1,
-            limit: 100,
-            total: fallbackAppointments.length,
-            totalPages: 1,
-          },
-          warning: "Serving fallback appointment list due to query compatibility issue",
-        });
-      } catch (fallbackError) {
-        logger.error("Fallback appointment query failed:", fallbackError);
-        return res.status(500).json({
-          error: "Failed to fetch appointments",
-          message: "Failed to fetch appointments",
-        });
-      }
+      res.status(500).json({ error: "Failed to fetch appointments" });
     }
   }
 

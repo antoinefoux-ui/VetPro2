@@ -114,39 +114,7 @@ export class InvoiceController {
       });
     } catch (error) {
       logger.error("Error fetching invoices:", error);
-
-      try {
-        const fallbackInvoices = await prisma.invoice.findMany({
-          take: 100,
-          orderBy: { issueDate: "desc" },
-          select: {
-            id: true,
-            invoiceNumber: true,
-            status: true,
-            totalAmount: true,
-            balanceDue: true,
-            dueDate: true,
-            notes: true,
-          },
-        });
-
-        return res.status(200).json({
-          data: fallbackInvoices,
-          pagination: {
-            page: 1,
-            limit: 100,
-            total: fallbackInvoices.length,
-            totalPages: 1,
-          },
-          warning: "Serving fallback invoice list due to query compatibility issue",
-        });
-      } catch (fallbackError) {
-        logger.error("Fallback invoice query failed:", fallbackError);
-        return res.status(500).json({
-          error: "Failed to fetch invoices",
-          message: "Failed to fetch invoices",
-        });
-      }
+      res.status(500).json({ error: "Failed to fetch invoices" });
     }
   }
 
@@ -804,6 +772,45 @@ export class InvoiceController {
       res.status(500).json({ error: "Failed to delete invoice" });
     }
   }
+
+  /**
+   * Update invoice basic fields
+   */
+  static async update(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { notes, dueDate, status } = req.body;
+
+      const invoice = await prisma.invoice.update({
+        where: { id },
+        data: {
+          ...(notes !== undefined ? { notes } : {}),
+          ...(dueDate ? { dueDate: new Date(dueDate) } : {}),
+          ...(status ? { status } : {}),
+        },
+      });
+
+      res.json(invoice);
+    } catch (error) {
+      logger.error('Error updating invoice:', error);
+      res.status(500).json({ error: 'Failed to update invoice' });
+    }
+  }
+
+  /**
+   * Delete invoice
+   */
+  static async delete(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      await prisma.invoice.delete({ where: { id } });
+      res.status(204).send();
+    } catch (error) {
+      logger.error('Error deleting invoice:', error);
+      res.status(500).json({ error: 'Failed to delete invoice' });
+    }
+  }
+
 }
 
 export default InvoiceController;

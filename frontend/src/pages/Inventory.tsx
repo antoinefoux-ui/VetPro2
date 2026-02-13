@@ -1,8 +1,6 @@
 import { FormEvent, useEffect, useState } from 'react';
 import api from '../config/api';
 
-type InventoryListResponse = InventoryRow[] | { data?: InventoryRow[] };
-
 interface InventoryRow {
   id: string;
   name: string;
@@ -25,8 +23,8 @@ function Inventory() {
   useEffect(() => {
     const load = async () => {
       try {
-        const response = await api.fetch<InventoryListResponse>('/api/inventory');
-        const data = Array.isArray(response) ? response : response.data;
+        const response = await api.fetch('/api/inventory');
+        const data = (response.data ?? response) as InventoryRow[];
         setRows(Array.isArray(data) ? data : []);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load inventory');
@@ -38,7 +36,7 @@ function Inventory() {
   const createItem = async (e: FormEvent) => {
     e.preventDefault();
     try {
-      const created = await api.fetch<InventoryRow>('/api/inventory', {
+      const created = await api.fetch('/api/inventory', {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify(createForm),
@@ -64,7 +62,7 @@ function Inventory() {
   const saveEdit = async () => {
     if (!editingId) return;
     try {
-      const updated = await api.fetch<Partial<InventoryRow>>(`/api/inventory/${editingId}`, {
+      const updated = await api.fetch(`/api/inventory/${editingId}`, {
         method: 'PUT',
         headers: authHeaders,
         body: JSON.stringify(draft),
@@ -79,10 +77,14 @@ function Inventory() {
 
   const removeRow = async (id: string) => {
     try {
-      await api.fetch<void>(`/api/inventory/${id}`, {
+      const response = await fetch(`${api.baseURL}/api/inventory/${id}`, {
         method: 'DELETE',
-        headers: authHeaders,
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders,
+        },
       });
+      if (!response.ok) throw new Error('Delete failed');
       setRows((prev) => prev.filter((item) => item.id !== id));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete item');
