@@ -4,7 +4,6 @@ import { z } from 'zod';
 import bcrypt from 'bcrypt';
 import logger from '../utils/logger';
 
-const prismaAny = prisma as any;
 
 const createUserSchema = z.object({
   email: z.string().email(),
