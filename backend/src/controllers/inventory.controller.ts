@@ -658,6 +658,18 @@ export class InventoryController {
     return 'in_stock';
   }
 
+
+  private static async getLowStockItemIds(): Promise<string[]> {
+    const rows = await db.$queryRaw<Array<{ id: string }>>`
+      SELECT id
+      FROM inventory_items
+      WHERE current_stock <= minimum_stock
+        AND current_stock > 0
+    `;
+
+    return rows.map((row) => row.id);
+  }
+
   private static async identifyItemsNeedingOrders(): Promise<any[]> {
     const items = await prismaAny.inventoryItem.findMany({
       where: {
