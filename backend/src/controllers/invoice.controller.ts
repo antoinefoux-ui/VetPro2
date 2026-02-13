@@ -135,11 +135,7 @@ export class InvoiceController {
               visitNotes: true,
             },
           },
-          items: {
-            include: {
-              inventoryItem: true,
-            },
-          },
+          items: true,
           payments: true,
           generatedBy: {
             select: {
@@ -266,11 +262,7 @@ export class InvoiceController {
       const currentInvoice = await prisma.invoice.findUnique({
         where: { id },
         include: {
-          items: {
-            include: {
-              inventoryItem: true,
-            },
-          },
+          items: true,
           client: true,
           pet: true,
         },
@@ -308,8 +300,14 @@ export class InvoiceController {
             subtotal += itemSubtotal;
 
             return {
-              ...item,
               invoiceId: id,
+              itemType: item.itemType,
+              description: item.description,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              taxRate: item.taxRate,
+              discountPercentage: item.discountPercentage,
+              inventoryItemId: item.inventoryItemId,
               subtotal: itemSubtotal,
               total: itemTotal,
             };
