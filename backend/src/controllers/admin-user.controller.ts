@@ -179,7 +179,7 @@ export class AdminUserController {
       const passwordHash = await bcrypt.hash(validated.password, 12);
 
       // Create user
-      const { password: _password, ...userData } = validated;
+      const { password, ...userData } = validated;
       const user = await prismaAny.user.create({
         data: {
           ...userData,

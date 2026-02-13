@@ -5,6 +5,7 @@ import logger from "../utils/logger";
 
 import { addMinutes, addHours, startOfDay, endOfDay, parseISO } from "date-fns";
 
+// REMOVED: const prismaAny = prisma as any;
 
 const createAppointmentSchema = z.object({
   petId: z.string().uuid(),
